@@ -1,0 +1,31 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "architecture": "arm64",
+  "scope": "fresh process, document construction and validated bracket evaluation; no export; single sample per resolution",
+  "results": [
+    {
+      "segments": 24,
+      "seconds": 0.598,
+      "exit_code": 0,
+      "response": "ok cut profile floating vertices 761 triangles 1522 solid yes volume 3.48024539467225E+04 min-3.00000000000000E+01-4.00000000000000E+00-2.00000000000000E+01 max 3.00000000000000E+01 5.40000000000000E+01 2.00000000000000E+01"
+    },
+    {
+      "segments": 64,
+      "seconds": 1.8771,
+      "exit_code": 0,
+      "response": "ok cut profile floating vertices 1637 triangles 3274 solid yes volume 3.47985217932100E+04 min-3.00000000000000E+01-4.00000000000000E+00-2.00000000000000E+01 max 3.00000000000000E+01 5.40000000000000E+01 2.00000000000000E+01"
+    },
+    {
+      "segments": 128,
+      "seconds": 8.839,
+      "exit_code": 0,
+      "response": "ok cut profile floating vertices 3081 triangles 6162 solid yes volume 3.47980376119096E+04 min-3.00000000000000E+01-4.00000000000000E+00-2.00000000000000E+01 max 3.00000000000000E+01 5.40000000000000E+01 2.00000000000000E+01"
+    },
+    {
+      "segments": 256,
+      "seconds": 51.8832,
+      "exit_code": 0,
+      "response": "ok cut profile floating vertices 5965 triangles 11930 solid yes volume 3.47979165118806E+04 min-3.00000000000000E+01-4.00000000000000E+00-2.00000000000000E+01 max 3.00000000000000E+01 5.40000000000000E+01 2.00000000000000E+01"
+    }
+  ]
+}

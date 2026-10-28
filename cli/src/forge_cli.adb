@@ -21,6 +21,7 @@ procedure Forge_CLI is
    R        : Response;
    Failures : Natural := 0;
    I        : Positive := 1;
+   Inspect_Mode : Boolean := False;
 
    procedure Run (Line : String);
    procedure Run (Line : String) is
@@ -30,15 +31,31 @@ procedure Forge_CLI is
       if not R.Ok then
          Failures := Failures + 1;
       end if;
+      if Inspect_Mode then
+         Put_Line ("--- Tree ---");
+         for J in 1 .. Solid_Count (S) loop
+            Execute (S, "tree " & Forge.Image (Solid_Name (S, J)), R);
+            Put_Line (Image (R));
+         end loop;
+         Put_Line ("--- Geometry status ---");
+         for J in 1 .. Solid_Count (S) loop
+            Execute (S, "info " & Forge.Image (Solid_Name (S, J)), R);
+            Put_Line (Image (R));
+         end loop;
+         Put_Line ("--- Command ---");
+      end if;
    end Run;
 
 begin
    while I <= Argument_Count loop
-      if Argument (I) = "-c" and then I < Argument_Count then
+      if Argument (I) = "--inspect" then
+         Inspect_Mode := True;
+         I := I + 1;
+      elsif Argument (I) = "-c" and then I < Argument_Count then
          Run (Argument (I + 1));
          I := I + 2;
       else
-         Run ("load " & Argument (I));
+         Run ("load """ & Argument (I) & """");
          I := I + 1;
       end if;
    end loop;

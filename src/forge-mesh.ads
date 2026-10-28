@@ -1,22 +1,8 @@
---  Indexed triangle mesh: the one representation every operation reads
---  and writes. Bounded by discriminants, no heap in the kernel; the
---  session allocates meshes, the kernel only computes on them.
---
---  A solid is a mesh that is CLOSED (watertight) and CONSISTENTLY
---  ORIENTED (every triangle counter-clockwise seen from outside, so
---  every shared edge appears once in each direction). Is_Solid checks
---  both. Every operation in the kernel promises: solid in, solid out.
---
---  PROOF TARGET (the "proven geometry" of the project, v1 = topology)
---    M1  No index out of range anywhere (free with SPARK once the
---        Well_Formed predicate is a precondition).
---    M2  Is_Watertight is exactly "every directed edge has exactly one
---        reverse twin". State it as a ghost quantifier, prove the body.
---    M3  Primitives produce meshes with Is_Solid (box first).
---    M4  Transforms preserve Is_Solid (they touch vertices only; the
---        topology is untouched, so this is an equality proof on the
---        index arrays; note that a negative scale flips orientation).
---    M5  Volume of a solid is positive iff outward-oriented.
+--  Bounded indexed triangle meshes. Well_Formed checks live distinct indices.
+--  Is_Watertight checks reverse-edge pairing; Is_Solid also requires four faces.
+--  These are structural/topological predicates, not full geometric validation.
+--  Forge.Validation additionally checks vertex fans, embedding and shell nesting.
+--  SPARK coverage is recorded in docs/VERIFICATION.md.
 
 package Forge.Mesh with SPARK_Mode is
 
@@ -81,8 +67,8 @@ package Forge.Mesh with SPARK_Mode is
    --  Every directed edge (a, b) of every triangle has exactly one
    --  triangle containing the reverse edge (b, a), and no triangle
    --  contains (a, b) twice. That single condition gives closed and
-   --  consistently oriented at once. O(NT**2) in the seed; a sort or
-   --  hash on edges is milestone 1.
+   --  consistently paired at edges. Sort-based O(NT log NT).
+   --  Vertex manifoldness and geometric embedding are checked by Forge.Validation.
 
    function Is_Solid (M : Tri_Mesh) return Boolean is
      (M.NT >= 4 and then Is_Watertight (M))

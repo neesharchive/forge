@@ -1,29 +1,8 @@
---  Boolean operations on solids. THE PROJECT.
---
---  Given two solids A and B, produce a solid that is their union,
---  difference (A minus B) or intersection. This is what makes a modeler
---  a modeler, and it is hard: the triangles of A and B must be split
---  along their mutual intersection curve, classified inside/outside the
---  other solid, and the kept pieces stitched into a closed mesh.
---
---  The seed body returns Ok = False with Reason = "not implemented".
---  Everything else (primitives, transforms, session, script, CLI, STL)
---  works around that hole, so the tool is usable from day one for
---  positioning primitives and exporting, and the hole is exactly the
---  size of the capstone.
---
---  Recommended path (ARCHITECTURE.md has the detail):
---    1. BSP-tree CSG (the classic "csg.js" algorithm): build a BSP from
---       each mesh, clip each against the other, invert as needed, merge.
---       Simple, robust enough for primitives, produces sliver triangles.
---       Milestone 2.
---    2. Exact arithmetic on the intersection curve (rational or
---       fixed-point predicates) so that Is_Solid holds on the output for
---       every input pair. Milestone 4; this is where "proven" gets teeth.
---
---  Contract every implementation must meet: solid in, solid out, or
---  Ok = False with a reason. Never a mesh that fails Is_Solid.
-
+--  Bounded approximate mesh Booleans using transient BSP trees.
+--  Caller owns scratch; inputs are unchanged. Success is a validated solid or
+--  canonical Empty. Failure clears the output and supplies a reason.
+--  This evaluator is tested Ada outside SPARK; selected model/numeric helpers
+--  are verified separately. It is not an exact-arithmetic Boolean kernel.
 with Forge.Mesh; use Forge.Mesh;
 
 package Forge.CSG with SPARK_Mode is
@@ -33,17 +12,46 @@ package Forge.CSG with SPARK_Mode is
    Max_Reason : constant := 64;
    subtype Reason_String is String (1 .. Max_Reason);
 
+   Max_Polygons : constant := 16_384;
+   Max_Nodes : constant := 8_192;
+   Max_Corners : constant := 256;
+   type Workspace is limited private;
+   --  Caller owns bounded scratch storage; no allocation in the evaluator.
+
    procedure Apply
      (Op     : Operation;
       A, B   : Tri_Mesh;
       Result : in out Tri_Mesh;
       Ok     : out Boolean;
       Reason : out Reason_String;
-      Last   : out Natural)
+      Last   : out Natural;
+      Work   : in out Workspace)
      with Pre  => Well_Formed (A) and then Well_Formed (B),
           Post => Well_Formed (Result)
                   and then Last <= Max_Reason
-                  and then (if not Ok then Result.NT = 0);
-   --  On Ok, Result is a solid. Reason (1 .. Last) says why not otherwise.
+                  and then (if not Ok then Result.NT = 0)
+                  and then (if Ok then Result.NT = 0 or else Is_Solid (Result));
+   --  On success, a validated solid or Empty. On failure, an empty result and reason.
 
+private
+   type Corner_Array is array (1 .. Max_Corners) of Vec3;
+   type Polygon is record
+      Count : Natural := 0;
+      V : Corner_Array := [others => Origin];
+      Normal : Vec3 := Origin;
+      W : Scalar := 0.0;
+      Next : Natural := 0;
+   end record;
+   type Polygon_Array is array (1 .. Max_Polygons) of Polygon;
+   type BSP_Node is record
+      Normal : Vec3 := Origin;
+      W : Scalar := 0.0;
+      Polys, Front, Back : Natural := 0;
+   end record;
+   type Node_Array is array (1 .. Max_Nodes) of BSP_Node;
+   type Workspace is limited record
+      P : Polygon_Array;
+      N : Node_Array;
+      Used_P, Used_N : Natural := 0;
+   end record;
 end Forge.CSG;

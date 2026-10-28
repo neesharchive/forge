@@ -1,32 +1,17 @@
-# ui: the contract
+# Front-end contract
 
-Not built yet. When it is, it obeys three rules, and CI will grep for
-the first one.
+`cli/bin/forge_cli --inspect` provides the implemented terminal tree/status/command
+demonstration. After each command it prints each named expression tree and the
+current evaluated geometry status. Failed geometry remains an inspectable model.
 
-1. **Nothing in `ui/` withs anything below `Forge.Session`.** The GUI
-   sees `Forge.Session` (Execute, Mesh_Of, History_*) and `Forge`
-   (Vec3, Name). It never sees `Forge.Mesh` operations, `Forge.CSG`,
-   `Forge.Primitives`.
-2. **Every button builds a line and calls `Execute`.** The line is
-   shown in a command bar at the bottom of the window before it runs.
-   A user who watches the bar for an hour can write `.forge` files.
-3. **Rendering reads `Mesh_Of (S, name)` after every `Execute`** and
-   uploads it to the GPU. It never mutates a mesh. Selection, camera,
-   colours and highlighting are UI state, not session state, and are
-   not saved in the document.
+A graphical viewport is an optional next front end. It must send mutations through
+`Forge.Session.Execute` and use read-only session views for rendering. Every button
+must correspond to a printable command. Mesh views can be null on evaluation
+failure and expire after a session mutation; reacquire them before GPU upload.
+Camera, selection and display colors remain front-end state.
 
-## Suggested stack
-
-- Window and input: [adi2](https://github.com/ovenpasta/adi2), with
-  the command bar as a text field and the solid list as a list widget.
-- Viewport: OpenGLAda into adi2's texture-view widget. One VBO per
-  solid, rebuilt when `Mesh_Of` changes (compare `NT` and a hash, or
-  just rebuild; parts are small).
-- Camera: orbit, pan, zoom on the mouse; nothing fancy.
-
-## Milestone 5 acceptance
-
-Open `examples/bracket.forge`, see three solids, type
-`difference cut base hole` in the bar (milestone 2 done), see the cut
-part, click Export, open the STL in another tool, it is watertight.
-Then do the same by clicking, and read the bar: same four lines.
+Acceptance example: load `examples/bracket.forge`, evaluate `cut`, inspect its tree,
+export `cut` to `bracket.obj`, undo/redo and export the same geometry again. The
+independent OBJ reader in `tests/integration.py` checks the file's connectivity,
+volume and bounds. No graphical window or OpenGL renderer is included in this
+implementation.

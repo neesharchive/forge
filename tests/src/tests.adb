@@ -9,6 +9,10 @@ with Forge.Primitives;
 with Forge.Session;    use Forge.Session;
 with Forge.STL;
 with Forge.Transform;
+with Forge.Fixed;
+with Forge.Fixed_Geometry;
+with Forge.Validation;
+with Interfaces;
 
 procedure Tests is
 
@@ -20,6 +24,9 @@ procedure Tests is
    procedure Test_STL;
    procedure Test_Commands;
    procedure Test_Session;
+   procedure Test_Booleans;
+   procedure Test_Fixed;
+   procedure Test_Validation;
 
    procedure Check (Name : String; Cond : Boolean) is
    begin
@@ -127,6 +134,14 @@ procedure Tests is
       Round_Trip ("difference d a c");
       Round_Trip ("copy k a");
       Round_Trip ("delete k");
+      Round_Trip ("setbox cut L 4 5 6");
+      Round_Trip ("setcylinder cut R 2 8 24");
+      Round_Trip ("settransform cut R translate 1 2 3");
+      Round_Trip ("settransform cut R rotate z 31");
+      Round_Trip ("settransform cut R scale 2");
+      Round_Trip ("setop cut . difference");
+      Round_Trip ("swap cut .");
+      Round_Trip ("replace cut L k");
 
       Parse ("box a 1 2", C, Ok, Err);
       Check ("too few args rejected", not Ok);
@@ -157,7 +172,11 @@ procedure Tests is
       Execute (S, "info nothere", R);
       Check ("unknown solid is an error", not R.Ok);
       Execute (S, "union u a b", R);
-      Check ("csg reports not implemented", not R.Ok and History_Length (S) = 3);
+      Check ("csg expression created", R.Ok and History_Length (S) = 4);
+      Execute (S, "evaluate u", R);
+      Check ("csg evaluates", R.Ok);
+      Execute (S, "undo", R);
+      Check ("undo removes Boolean", R.Ok and History_Length (S) = 3);
       Execute (S, "undo", R);
       Check ("undo removes copy", R.Ok and Solid_Count (S) = 1 and History_Length (S) = 2);
       Execute (S, "undo", R);
@@ -172,12 +191,142 @@ procedure Tests is
       Check ("history line", History_Line (S, 1) = "box a 1 1 1");
    end Test_Session;
 
+   procedure Test_Booleans is
+      S : Forge.Session.Session;
+      R : Response;
+      M : Mesh_View;
+      procedure Run (Line : String);
+      procedure Expect_Volume (N : String; V : Scalar);
+      procedure Run (Line : String) is
+      begin
+         Execute (S, Line, R);
+         Check (Line, R.Ok);
+      end Run;
+      procedure Expect_Volume (N : String; V : Scalar) is
+      begin
+         M := Mesh_Of (S, To_Name (N));
+         Check (N & " validated mesh", M /= null);
+         if M /= null then
+            Check (N & " expected volume", Near (Volume (M.all), V));
+         end if;
+      end Expect_Volume;
+   begin
+      Run ("box a 2 2 2"); Run ("box b 2 2 2"); Run ("translate b 1 0 0");
+      Run ("union u a b"); Expect_Volume ("u", 12.0);
+      Run ("intersect i a b"); Expect_Volume ("i", 4.0);
+      Run ("difference d a b"); Expect_Volume ("d", 4.0);
+      Run ("difference e a a"); Expect_Volume ("e", 0.0);
+      Run ("union ident a a"); Expect_Volume ("ident", 8.0);
+      Run ("intersect ident_i a a"); Expect_Volume ("ident_i", 8.0);
+      Run ("difference e2 e a"); Expect_Volume ("e2", 0.0);
+      Run ("union fromempty e a"); Expect_Volume ("fromempty", 8.0);
+      Run ("box far 2 2 2"); Run ("translate far 3 0 0");
+      Run ("union disjoint a far"); Expect_Volume ("disjoint", 16.0);
+      Run ("intersect disjoint_i a far"); Expect_Volume ("disjoint_i", 0.0);
+      Run ("difference disjoint_d a far"); Expect_Volume ("disjoint_d", 8.0);
+      Run ("box outer 4 4 4"); Run ("difference cavity outer a");
+      Expect_Volume ("cavity", 56.0);
+      Run ("box touch 2 2 2"); Run ("translate touch 2 0 0");
+      Run ("union face a touch"); Expect_Volume ("face", 16.0);
+      Run ("intersect face_i a touch"); Expect_Volume ("face_i", 0.0);
+      Run ("translate touch 0 2 0"); Run ("union edge a touch");
+      Execute (S, "evaluate edge", R);
+      Check ("edge contact rejected", not R.Ok);
+      Run ("undo"); Run ("redo");
+      Check ("redo restores edge expression", Has_Solid (S, To_Name ("edge")));
+      Run ("undo");
+      Execute (S, "box bad 0 1 1", R);
+      Check ("bad edit rejected", not R.Ok);
+      Run ("redo");
+      Check ("failed edit preserves redo", Has_Solid (S, To_Name ("edge")));
+      Run ("undo"); Run ("box branch 1 1 1");
+      Execute (S, "redo", R); Check ("new edit truncates redo", not R.Ok);
+      Run ("setbox d L 4 2 2"); Expect_Volume ("d", 8.0);
+      Expect_Volume ("a", 8.0);
+      Run ("undo"); Expect_Volume ("d", 4.0);
+      Run ("redo"); Expect_Volume ("d", 8.0);
+      Execute (S, "replace d invalid a", R);
+      Check ("invalid subtree edit rejected", not R.Ok);
+      Expect_Volume ("d", 8.0);
+   end Test_Booleans;
+
+   procedure Test_Fixed is
+      use Forge.Fixed;
+      use Forge.Fixed_Geometry;
+      use type Interfaces.Integer_64;
+      P : Point := (1, 2, 3);
+      Good : Boolean;
+      Q : Interfaces.Integer_64;
+      V : Tick;
+      Hit : Point;
+      A : constant Point := (1, 0, 0);
+      B : constant Point := (0, 1, 0);
+      C : constant Point := (1, 0, 1);
+   begin
+      Check ("fixed exact quarter turn", Quarter_Z (P) = (-2, 1, 3));
+      Translate (P, (Tick'Last, 0, 0), Good);
+      Check ("fixed overflow leaves input unchanged", not Good and then P = (1, 2, 3));
+      Translate (P, (4, -2, 0), Good);
+      Check ("fixed exact translation", Good and then P = (5, 0, 3));
+      Divide_Rounded (5, 2, Q); Check ("fixed positive tie-even", Q = 2);
+      Divide_Rounded (7, 2, Q); Check ("fixed positive odd tie", Q = 4);
+      Divide_Rounded (-5, 2, Q); Check ("fixed negative tie-even", Q = -2);
+      Divide_Rounded (-7, 2, Q); Check ("fixed negative odd tie", Q = -4);
+      Parse_Decimal ("0.1", V, Good);
+      Check ("fixed decimal parsed without binary float", Good and then V = 6554);
+      Parse_Decimal ("10000.000000001", V, Good);
+      Check ("fixed decimal range rejected", not Good);
+      Check ("fixed exact plane classification", Classify (A, B, C, (0, 0, 0)) /= On_Plane);
+      Split_Edge (A, B, C, (0, 0, 0), (2, 0, 0), Hit, Good);
+      Check ("fixed representable split", Good and then Hit = (1, 0, 0));
+      Split_Edge (A, B, C, (0, 0, 0), (1, 1, 0), Hit, Good);
+      Check ("fixed unsafe off-grid split rejected", not Good);
+   end Test_Fixed;
+
+   procedure Test_Validation is
+      use Forge.Validation;
+      M : Tri_Mesh (32, 64);
+      B : Tri_Mesh (16, 32);
+      Good : Boolean;
+      V : Vertex_Index;
+      Result : Status;
+      Shells : Natural;
+   begin
+      Forge.Primitives.Box (M, 2.0, 2.0, 2.0, Good);
+      Forge.Validation.Check (M, Result, Shells);
+      Tests.Check ("box full geometric validation", Result = Valid and Shells = 1);
+      M.V (2) := M.V (1);
+      Forge.Validation.Check (M, Result, Shells);
+      Tests.Check ("collapsed triangle rejected", Result = Degenerate_Face);
+      Forge.Primitives.Box (M, 2.0, 2.0, 2.0, Good);
+      for I in 1 .. M.NT loop
+         V := M.T (I).A; M.T (I).A := M.T (I).B; M.T (I).B := V;
+      end loop;
+      Forge.Validation.Check (M, Result, Shells);
+      Tests.Check ("inward shell rejected", Result = Incorrect_Shell_Orientation);
+      Forge.Primitives.Box (M, 2.0, 2.0, 2.0, Good);
+      Forge.Primitives.Box (B, 2.0, 2.0, 2.0, Good);
+      Forge.Transform.Translate (B, (0.5, 0.0, 0.0));
+      for I in 1 .. B.NV loop
+         Add_Vertex (M, B.V (I), V, Good);
+      end loop;
+      for I in 1 .. B.NT loop
+         Add_Triangle (M, B.T (I).A + 8, B.T (I).B + 8, B.T (I).C + 8, Good);
+      end loop;
+      Tests.Check ("overlapping shells pass edge closure", Is_Watertight (M));
+      Forge.Validation.Check (M, Result, Shells);
+      Tests.Check ("overlapping shells rejected geometrically", Result = Self_Intersection);
+   end Test_Validation;
+
 begin
    Test_Mesh;
    Test_Primitives;
    Test_STL;
    Test_Commands;
    Test_Session;
+   Test_Booleans;
+   Test_Fixed;
+   Test_Validation;
    New_Line;
    if Failures = 0 then
       Put_Line ("all tests passed");

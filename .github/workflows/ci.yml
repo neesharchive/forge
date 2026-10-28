@@ -1,31 +1,44 @@
 name: CI
-
-on:
-  push:
-  pull_request:
-
+on: [push, pull_request]
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: alire-project/setup-alire@v4
+      - name: Proof engine runtime on macOS
+        if: runner.os == 'macOS'
+        run: brew install gmp
+      - name: Select compatible macOS SDK when installed
+        if: runner.os == 'macOS'
+        run: |
+          if [ -d /Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk ]; then
+            echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk" >> "$GITHUB_ENV"
+          fi
       - name: Build library
         run: alr -n build
-      - name: Tests
+      - name: Ada regression tests
+        working-directory: tests
         run: |
-          cd tests
           alr -n build
           ./bin/tests
-      - name: CLI runs the example and round-trips the document
-        run: |
-          cd cli
-          alr -n build
-          printf 'load ../examples/bracket.forge\nlist\ninfo base\nexport base /tmp/base.stl\nsave /tmp/rt.forge\n' \
-            | ./bin/forge_cli
-          ./bin/forge_cli -c "load /tmp/rt.forge" -c "info hole"
-          test -s /tmp/base.stl
-      - name: SPARK flow analysis
-        run: |
-          alr -n with gnatprove
-          alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
+      - name: CLI build
+        working-directory: cli
+        run: alr -n build
+      - name: Independent OBJ and document acceptance
+        run: python3 tests/integration.py
+      - name: Full SPARK flow analysis
+        run: alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
+      - name: SPARK arithmetic, model and history proofs
+        run: >-
+          alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2
+          --checks-as-errors=on -u forge-fixed.adb forge-model.adb forge-numeric.ads forge-history.adb
+      - name: Retain proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spark-${{ matrix.os }}
+          path: obj/gnatprove/gnatprove.out

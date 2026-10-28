@@ -1,0 +1,7 @@
+# Baseline primitive fixture, before Boolean composition.
+box base 60 8 40
+box wall 8 50 40
+translate wall -26 29 0
+cylinder hole 4 10 24
+rotate hole x 90
+translate hole 15 0 0

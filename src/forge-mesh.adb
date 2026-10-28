@@ -35,6 +35,8 @@ package body Forge.Mesh with SPARK_Mode is
    begin
       To.NV := 0;
       To.NT := 0;
+      To.V := [others => Origin];
+      To.T := [others => <>];
       if From.NV > To.Cap_V or else From.NT > To.Cap_T then
          Ok := False;
          return;
@@ -69,28 +71,78 @@ package body Forge.Mesh with SPARK_Mode is
    end Edge;
 
    function Is_Watertight (M : Tri_Mesh) return Boolean is
-      F, T, F2, T2 : Vertex_Index;
-      Twins, Dups  : Natural;
+      type Directed_Edge is record
+         A, B : Vertex_Index;
+      end record;
+      type Edge_List is array (Natural range <>) of Directed_Edge;
+      Edges : Edge_List (1 .. 3 * Natural (M.NT)) := [others => (0, 0)];
+      Count : Natural := 0;
+      F, T : Vertex_Index;
+
+      function Less (A, B : Directed_Edge) return Boolean;
+      procedure Sift (First, Last : Natural);
+
+      function Less (A, B : Directed_Edge) return Boolean is
+         A0 : constant Vertex_Index := Vertex_Index'Min (A.A, A.B);
+         B0 : constant Vertex_Index := Vertex_Index'Min (B.A, B.B);
+      begin
+         return A0 < B0 or else
+           (A0 = B0 and then Vertex_Index'Max (A.A, A.B) < Vertex_Index'Max (B.A, B.B));
+      end Less;
+
+      procedure Sift (First, Last : Natural) is
+         Root : Natural := First;
+         Child : Natural;
+         Temp : Directed_Edge;
+      begin
+         while Root <= Last / 2 loop
+            pragma Loop_Variant (Increases => Root);
+            Child := Root * 2;
+            if Child < Last and then Less (Edges (Child), Edges (Child + 1)) then
+               Child := Child + 1;
+            end if;
+            exit when not Less (Edges (Root), Edges (Child));
+            Temp := Edges (Root); Edges (Root) := Edges (Child); Edges (Child) := Temp;
+            Root := Child;
+         end loop;
+      end Sift;
    begin
       for I in 1 .. M.NT loop
          for K in 1 .. 3 loop
             Edge (M, I, K, F, T);
-            Twins := 0;
-            Dups  := 0;
-            for J in 1 .. M.NT loop
-               for L in 1 .. 3 loop
-                  Edge (M, J, L, F2, T2);
-                  if F2 = T and then T2 = F then
-                     Twins := Twins + 1;
-                  elsif F2 = F and then T2 = T and then (I /= J or else K /= L) then
-                     Dups := Dups + 1;
-                  end if;
-               end loop;
-            end loop;
-            if Twins /= 1 or else Dups /= 0 then
+            Count := Count + 1;
+            Edges (Count) := (F, T);
+         end loop;
+      end loop;
+      if Count = 0 then
+         return True;
+      end if;
+      for I in reverse 1 .. Count / 2 loop
+         Sift (I, Count);
+      end loop;
+      for I in reverse 2 .. Count loop
+         declare
+            Temp : constant Directed_Edge := Edges (1);
+         begin
+            Edges (1) := Edges (I); Edges (I) := Temp;
+         end;
+         Sift (1, I - 1);
+      end loop;
+      if Count rem 2 /= 0 then
+         return False;
+      end if;
+      for I in 1 .. Count / 2 loop
+         declare
+            A : constant Directed_Edge := Edges (2 * I - 1);
+            B : constant Directed_Edge := Edges (2 * I);
+         begin
+            if A.A /= B.B or else A.B /= B.A then
                return False;
             end if;
-         end loop;
+            if 2 * I < Count and then not Less (B, Edges (2 * I + 1)) then
+               return False;
+            end if;
+         end;
       end loop;
       return True;
    end Is_Watertight;

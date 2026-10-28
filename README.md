@@ -1,141 +1,131 @@
-# forge
+# Forge
 
-Solid modeling with a proven topology kernel, driven by text. A CAD
-engine you script, and a GUI that is a script generator.
+An Ada solid modeler driven by a replayable text document. This implementation adds
+editable expression trees, working BSP mesh Booleans, undo/redo and Wavefront OBJ
+export to the original seed. The public mutation interface is
+`Forge.Session.Execute (Session, Line, Response)`.
 
-GNAT Academic Program capstone project. Proposal title: *Forge: 3D CAD,
-Solid Modeling with a Proven Geometry Kernel*.
+## Build and run
 
-## What it is
-
+```sh
+alr -n build
+cd tests
+alr -n build
+./bin/tests
+cd ../cli
+alr -n build
+./bin/forge_cli ../examples/bracket.forge
+cd ..
+python3 tests/integration.py
 ```
-$ forge_cli
-box base 60 8 40
-ok
-cylinder hole 4 10 24
-ok
-rotate hole x 90
-ok
-translate hole 15 0 0
-ok
-info hole
-ok hole vertices 50 triangles 96 solid yes volume 4.969E+02 min ... max ...
+
+For the terminal tree/status/command demonstration, run
+`cli/bin/forge_cli --inspect`. Type one modeling command at a time. The terminal
+prints the current trees and evaluated geometry status after each command.
+
+```text
+box base 40 20 10
+cylinder hole 4 20 32
 difference cut base hole
-err boolean operations are not implemented yet        <- the project
-export base base.stl
-ok wrote 684 bytes to base.stl
+tree cut
+bounds cut
+evaluate cut
+info cut
+setcylinder cut R 5 20 32
+undo
+redo
 save bracket.forge
-ok saved 4 commands to bracket.forge
+export cut bracket.obj
 ```
 
-That transcript is the whole architecture:
+An `ok model updated; mesh not evaluated` response means the symbolic edit
+succeeded. `evaluate`, `info`, mesh read-back and export evaluate geometry.
+An unsuccessful evaluation never exposes a stale mesh. Empty Boolean results are
+successful, but cannot be exported as a solid OBJ. Export requires `.obj`.
 
-- **The document is text.** A `.forge` file is the command history,
-  one line per operation. There is no binary model format to keep in
-  sync; the text is the model. Undo is "replay minus the last line".
-- **One entry point.** `Forge.Session.Execute (S, Line, Response)`.
-  The CLI feeds it stdin. A GUI feeds it the line it built when you
-  clicked. An agent feeds it the line it reasoned to. All three get
-  `ok` or `err reason` back, and can `info` anything.
-- **The GUI cannot pollute the engine** because it has no other door.
-  It renders `Mesh_Of (S, name)` (a read-only view) and sends lines.
-  Everything the GUI can do, a script can do, by construction.
-- **The kernel never allocates and never does I/O.** `Forge.Mesh` and
-  below are SPARK-clean computations on meshes they are handed.
-  `Forge.Session` owns memory; `cli/` and `ui/` own files and screens.
+## Model and history
 
-"Proven geometry" in year one means proven **topology**: a solid is a
-closed, consistently oriented triangle mesh, `Is_Solid` says so, and
-every kernel operation promises solid in, solid out. Coordinates are
-`Long_Float`; proving floating-point booleans is not a capstone.
+Each named object owns an independent expression tree. Primitive leaves retain
+parameters; unary transform nodes preserve operation order; binary Boolean nodes
+retain ordered operands. Boolean creation and `copy` copy operand expressions.
+Changing a separately named source later does **not** change an existing result.
+Use subtree editing to change the result's own copied parameters.
+`bounds NAME` computes conservative symbolic bounds without generating a mesh;
+`info NAME` reports bounds of the evaluated mesh.
 
-## What is in the seed
+`tree cut` prints root-relative paths: `.` is the root, `L`/`R` are Boolean
+children and `C` descends through a transform. Examples:
 
-```
-src/forge.ads             Scalar, Vec3, Axis, Name                          Pure, SPARK
-src/forge-mesh.ads        Tri_Mesh, Well_Formed, Is_Watertight, Volume      SPARK, proof target
-src/forge-primitives.ads  Box, Cylinder (solid, centred)                    done
-src/forge-transform.ads   Translate, Rotate, Scale                          done
-src/forge-csg.ads         Union, Difference, Intersection                   PLACEHOLDER: the project
-src/forge-stl.ads         binary STL writer                                 done
-src/forge-commands.ads    the grammar: Parse <-> Image, round-trips         done
-src/forge-session.ads     named solids, history, undo, save/load, Execute   done
-cli/                      REPL, file runner, -c one-liners; exit = failures  done
-ui/README.md              the contract for the GUI (adi2 + OpenGLAda)        contract only
-examples/bracket.forge    an L bracket with a hole waiting for difference
-tests/                    56 checks: topology, primitives, STL, grammar round trip, session
+```text
+params cut R
+setbox cut L 50 20 10
+setcylinder cut R 5 20 48
+setop cut . union
+swap cut .
+replace cut R hole
+settransform positioned . translate 10 0 0
+settransform rotated . rotate z 90
+settransform scaled . scale 2
 ```
 
-Everything runs. The hole in the middle is exactly the size of the
-capstone: `Forge.CSG.Apply`.
+Undo/redo replay the active history prefix into candidate state before commit.
+A new successful edit after undo discards redo; a failed edit does not. Load is
+transactional and accepts only modeling commands, comments and compatible format
+metadata. Quoted paths support spaces. Save records the active history, not the
+redo suffix or cached meshes.
 
-Read `ARCHITECTURE.md` before touching anything.
+## Geometry and numbers
 
-## Milestones
+Production evaluation uses the existing `Long_Float` scalar and bounded BSP
+clipping. The declared coordinate domain is +/-10,000 mm, with an absolute
+1e-8 mm positional tolerance; supported parts must have well-separated features.
+This is approximate polygonal geometry, not an exact analytic CAD kernel.
 
-1. **Faster `Is_Watertight`.** It is O(NT^2) in the seed. Sort the
-   directed edges, or hash them; keep the spec. Then prove it (M2).
-2. **BSP-tree CSG.** The classic algorithm (csg.js): build a BSP from
-   each mesh, clip each against the other, invert for difference,
-   concatenate. Robust enough for primitives, produces slivers. When
-   `difference cut base hole` returns `ok` and `info cut` says
-   `solid yes`, the bracket in `examples/` is a real part.
-3. **Extrude.** A 2D polygon along Z. Second primitive, first one
-   with user-supplied topology, so the "solid out" promise has to be
-   checked, not assumed.
-4. **Robust CSG.** Exact predicates on the intersection curve so that
-   `Is_Solid` holds on the output for every input pair. This is where
-   "proven" gets teeth, and it is a year-two topic if year one lands
-   milestone 2 well.
-5. **The GUI.** See `ui/README.md`. adi2 window, OpenGLAda viewport
-   in a texture view, a command line at the bottom that shows every
-   line the buttons generate. Not before milestone 2.
+Validation checks finite/ranged coordinates, nondegenerate faces, oriented edge
+pairing, vertex fans, triangle intersections and shell nesting/orientation.
+Validation is limited to 20,000 triangles; larger outputs fail explicitly. BSP
+scratch permits 16,384 polygons, 8,192 splitter nodes and 256 corners per polygon.
+Model trees permit 4,096 allocated nodes and depth 128; there are 64 named objects
+and 4,096 history commands. Capacity or precision failures do not become solids.
 
-## Build
+`Forge.Fixed` and `Forge.Fixed_Geometry` are a separate fixed-grid feasibility
+implementation: 2^-16 mm ticks, exact quarter turns, checked translation,
+ties-to-even integer rounding, decimal parsing without a binary-float intermediate,
+128-bit determinant classification and checked grid edge construction. An off-grid
+intersection that cannot remain on its plane is rejected. This prototype is not a
+second production BSP backend. See [numeric decision](docs/NUMERICS.md).
 
-Three [Alire](https://alire.ada.dev) crates; cli and tests pin the
-library by path.
+## SPARK verification
 
-```
-alr build
-cd tests && alr build && ./bin/tests
-cd cli   && alr build && ./bin/forge_cli ../examples/bracket.forge
-alr with gnatprove && alr exec -- gnatprove -P forge.gpr --mode=flow
-```
+Run `tools/verify.sh` for the complete build, tests, independent OBJ acceptance,
+flow and proof gates. Set `ALR=/absolute/path/to/alr` if needed. On macOS it selects
+an installed macOS 15 SDK when available to avoid GNAT 16 linker incompatibility
+with newer SDK library stubs, even if the host exports a newer SDKROOT. Set
+`FORGE_SDKROOT` to explicitly override that choice. For manual builds on affected Macs, first set
+`SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk`.
 
-Contracts are checked at runtime (`-gnata`). Warnings are errors.
-
-## Driving it from anything
-
-Because the protocol is lines in, lines out:
-
-```
-echo "box b 1 2 3" | forge_cli
-forge_cli -c "load part.forge" -c "info body" -c "export body body.stl"
-python: subprocess.Popen(["forge_cli"], stdin=PIPE, stdout=PIPE)
+```sh
+alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
+alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 \
+  --checks-as-errors=on -u forge-fixed.adb forge-model.adb forge-numeric.ads forge-history.adb
 ```
 
-An MCP server that exposes `execute(line)` and `history()` is an
-afternoon, and then an agent designs parts by talking to the same
-engine the GUI uses. That is the 2026 answer to AutoLISP.
+GNATprove is included as a verification-tool dependency. On Apple Silicon the
+provided proof engine also needs GMP (`brew install gmp`). Flow and contract proof
+are separate gates. The BSP evaluator, geometric validator, fixed-geometry
+prototype, parser/session and OBJ encoder are tested Ada outside SPARK; the
+entire floating-point Boolean algorithm is **not** formally proved. See
+[verification scope](docs/VERIFICATION.md) for evidence and limits.
 
-## Rules of the road
+The old `Forge.STL` serializer remains as an independent compatibility package;
+the session export command and examples use OBJ.
 
-- `src/` below `Forge.Session` has no I/O and no allocation.
-- Every kernel operation: solid in, solid out, or `Ok = False` with a
-  reason. Never a mesh that fails `Is_Solid` handed back as a result.
-- Every new modeling command gets a `Parse` case, an `Image` case, a
-  round-trip test, and a line in the grammar comment. No command
-  exists that the text cannot express.
-- Nothing in `ui/` or `cli/` withs anything below `Forge.Session`.
+## Further documentation
 
-See `CONTRIBUTING.md` for the fork workflow.
+- [Architecture](ARCHITECTURE.md)
+- [Requirements and implementation stages](docs/REQUIREMENTS.md)
+- [Verification](docs/VERIFICATION.md)
+- [Numerical decision](docs/NUMERICS.md)
 
-## Contact
-
-Olivier Henley, GAP Coordinator, AdaCore. Weekly meeting, plus the
-project Discord.
-
-## License
-
-Apache-2.0. See `LICENSE`.
+License: Apache-2.0. The BSP operation sequences are adapted from Evan Wallace's
+MIT-licensed csg.js; its notice is in `NOTICE`.

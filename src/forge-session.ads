@@ -1,25 +1,12 @@
---  The session: the single entry point for every front end.
---
---     Execute (S, "box base 40 20 10", Response)
---
---  That is the whole API. The CLI reads lines from stdin and calls it.
---  The GUI builds a line when you click and calls it. An agent calls
---  it. A .forge file is lines; Load calls it once per line. Nothing
---  above this package touches the kernel directly, so nothing above
---  this package can do what a script cannot.
---
---  State = named solids + history of modeling commands. The solids are
---  always what you get by replaying the history from empty; Undo pops
---  the history and replays. O(n) per undo, obviously correct, and it
---  keeps the invariant "the text is the model" literally true.
---
---  Memory: meshes are heap-allocated here, and only here. The kernel
---  (Forge.Mesh and below) never allocates; it computes on meshes it is
---  handed. This package is a desktop program's business.
---
---  Read-back for renderers is Mesh_Of: a constant view of a named
---  solid. A GUI draws that; it does not edit it.
-
+--  Transactional replay document, independent model trees and lazy meshes.
+--  Execute is the single mutation entry point. Successful modeling responses
+--  describe edits, not mesh evaluation; evaluate/info/export request geometry.
+--  Undo/redo retain a history prefix, failed edits preserve redo, and load is atomic.
+--  Mesh_Of evaluates current geometry, returns null on failure and never returns
+--  a stale prior mesh. Views expire on the next mutation of the session.
+with Ada.Finalization;
+with Forge.Model;
+with Forge.History;
 with Forge.Commands; use Forge.Commands;
 with Forge.Mesh;     use Forge.Mesh;
 
@@ -28,11 +15,11 @@ with Bedrock.Responses;
 package Forge.Session is
 
    Max_Solids  : constant := 64;
-   Max_History : constant := 4096;
+   Max_History : constant := Forge.History.Max_Count;
 
-   type Session is limited private;
+   type Session is new Ada.Finalization.Limited_Controlled with private;
 
-   Max_Response : constant := 1024;
+   Max_Response : constant := 32_768;
 
    --  The GAP line protocol's reply, from bedrock: "ok", "ok <info>",
    --  or "err <reason>". Same type in framewise and yarlib's console.
@@ -41,11 +28,8 @@ package Forge.Session is
    function Image (R : Response) return String renames Responses.Image;
 
    procedure Execute (S : in out Session; Line : String; R : out Response);
-   --  Parses and runs one line. Modeling commands are appended to the
-   --  history only if they succeed. Queries do not change state.
-   --  Export writes a file; Save writes the history; Load replaces the
-   --  session with the file's history (replayed, stopping at the first
-   --  failing line, which is reported).
+   --  Atomically applies a modeling edit, query or document action.
+   --  Export writes OBJ; failed loading preserves the previous document.
 
    ---------------------------------------------------------------------
    --  Read-back, for front ends
@@ -59,7 +43,7 @@ package Forge.Session is
    type Mesh_View is access constant Tri_Mesh;
    function Mesh_Of (S : Session; N : Name) return Mesh_View
      with Pre => Has_Solid (S, N);
-   --  Valid until the next Execute. Copy it if you need it longer.
+   --  Null on failed evaluation; valid until the next session mutation.
 
    function History_Length (S : Session) return Natural;
    function History_Line (S : Session; I : Positive) return String
@@ -67,28 +51,28 @@ package Forge.Session is
    --  The document, line by line. Save writes exactly these.
 
 private
-
-   Default_Cap_V : constant Vertex_Index   := 65_536;
+   Default_Cap_V : constant Vertex_Index := 65_536;
    Default_Cap_T : constant Triangle_Index := 131_072;
-   --  Every solid gets this much room. Enough for a 256-segment
-   --  cylinder squared. A boolean result that needs more reports it.
-
    type Mesh_Access is access Tri_Mesh;
-
+   type Evaluation_State is (Not_Evaluated, Evaluated_Solid, Evaluated_Empty, Failed);
    type Solid is record
       Used : Boolean := False;
-      N    : Name;
-      M    : Mesh_Access := null;
+      N : Name;
+      Root : Model.Node_Id := 0;
+      M : Mesh_Access := null;
+      Status : Evaluation_State := Not_Evaluated;
    end record;
-
    type Solid_Table is array (1 .. Max_Solids) of Solid;
-
-   type History_Array is array (1 .. Max_History) of Command;
-
-   type Session is limited record
-      Solids  : Solid_Table;
-      History : History_Array;
-      Count   : Natural := 0;   --  history length
+   type State is record
+      Solids : Solid_Table;
+      Tree : Model.Tree;
    end record;
-
+   type State_Access is access State;
+   type History_Array is array (1 .. Max_History) of Command;
+   type Session is new Ada.Finalization.Limited_Controlled with record
+      Data : State_Access := null;
+      History : History_Array;
+      Cursor : Forge.History.Cursor;
+   end record;
+   overriding procedure Finalize (S : in out Session);
 end Forge.Session;

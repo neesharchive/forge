@@ -1,8 +1,10 @@
+with Ada.Text_IO;
+with Ada.Strings.Fixed;
 package body Forge.Commands with SPARK_Mode => Off is
    --  Off: 'Value and 'Image on floats are not in SPARK. The grammar is
    --  small enough that a hand-written SPARK tokenizer is a fair task.
 
-   Max_Tokens : constant := 8;
+   Max_Tokens : constant := 10;
    type Token_Bounds is record
       First, Last : Natural := 0;
    end record;
@@ -16,20 +18,35 @@ package body Forge.Commands with SPARK_Mode => Off is
    procedure Tokenize (Line : String; T : out Token_Array; N : out Natural) is
       I : Natural := Line'First;
    begin
-      N := 0;
-      T := [others => <>];
+      N := 0; T := [others => <>];
       while I <= Line'Last loop
-         while I <= Line'Last and then Line (I) = ' ' loop
+         while I <= Line'Last and then Line (I) in ' ' | ASCII.HT loop
             I := I + 1;
          end loop;
          exit when I > Line'Last;
-         exit when N = Max_Tokens;
+         if N = Max_Tokens then
+            N := Max_Tokens + 1; return;
+         end if;
          N := N + 1;
-         T (N).First := I;
-         while I <= Line'Last and then Line (I) /= ' ' loop
-            I := I + 1;
-         end loop;
-         T (N).Last := I - 1;
+         if Line (I) = '"' then
+            I := I + 1; T (N).First := I;
+            while I <= Line'Last and then Line (I) /= '"' loop
+               I := I + 1;
+            end loop;
+            if I > Line'Last then
+               N := Max_Tokens + 1; return;
+            end if;
+            T (N).Last := I - 1; I := I + 1;
+            if I <= Line'Last and then Line (I) not in ' ' | ASCII.HT then
+               N := Max_Tokens + 1; return;
+            end if;
+         else
+            T (N).First := I;
+            while I <= Line'Last and then Line (I) not in ' ' | ASCII.HT loop
+               I := I + 1;
+            end loop;
+            T (N).Last := I - 1;
+         end if;
       end loop;
    end Tokenize;
 
@@ -47,7 +64,10 @@ package body Forge.Commands with SPARK_Mode => Off is
    function To_Path (S : String) return Path_String is
       P : Path_String;
    begin
-      P.Length := Natural'Min (S'Length, Max_Path);
+      if S'Length > Max_Path then
+         raise Constraint_Error;
+      end if;
+      P.Length := S'Length;
       P.Text (1 .. P.Length) := S (S'First .. S'First + P.Length - 1);
       return P;
    end To_Path;
@@ -95,7 +115,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       end Get_Num;
 
       procedure Get_Name (Tok_I, Into : Positive) is
-         S : constant String := Tok (Tok_I);
+         S : constant String := (if G then Tok (Tok_I) else "");
       begin
          if not G then
             return;
@@ -114,7 +134,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       end Get_Name;
 
       procedure Get_Axis (Tok_I : Positive) is
-         S : constant String := Lower (Tok (Tok_I));
+         S : constant String := (if G then Lower (Tok (Tok_I)) else "");
       begin
          if S = "x" then
             Ax := X;
@@ -130,6 +150,9 @@ package body Forge.Commands with SPARK_Mode => Off is
       procedure Get_Segments (Tok_I : Positive) is
          V : Integer;
       begin
+         if not G then
+            return;
+         end if;
          V := Integer'Value (Tok (Tok_I));
          if V in 3 .. 256 then
             Seg := V;
@@ -160,6 +183,10 @@ package body Forge.Commands with SPARK_Mode => Off is
          C := (K => Comment);
          return;
       end if;
+      if N > Max_Tokens then
+         Fail ("too many tokens");
+         return;
+      end if;
 
       declare
          Verb : constant String := Lower (Tok (1));
@@ -167,6 +194,7 @@ package body Forge.Commands with SPARK_Mode => Off is
          if Verb = "box" then
             Need (5); Get_Name (2, 1); Get_Num (3, 1); Get_Num (4, 2); Get_Num (5, 3);
             if G then
+               G := Nums (1) > 0.0 and Nums (2) > 0.0 and Nums (3) > 0.0;
                C := (K => Box, Box_Name => Names (1), W => Nums (1), H => Nums (2), D => Nums (3));
             end if;
          elsif Verb = "cylinder" then
@@ -177,6 +205,7 @@ package body Forge.Commands with SPARK_Mode => Off is
             end if;
             Get_Name (2, 1); Get_Num (3, 1); Get_Num (4, 2);
             if G then
+               G := Nums (1) > 0.0 and Nums (2) > 0.0;
                C := (K => Cylinder, Cyl_Name => Names (1), R => Nums (1), CH => Nums (2),
                      Segments => Seg);
             end if;
@@ -220,6 +249,82 @@ package body Forge.Commands with SPARK_Mode => Off is
             if G then
                C := (K => Delete, Target => Names (1));
             end if;
+         elsif Verb = "tree" or else Verb = "evaluate" or else Verb = "bounds" then
+            Need (2); Get_Name (2, 1);
+            if G then
+               if Verb = "tree" then
+                  C := (K => Tree, Target => Names (1));
+               elsif Verb = "bounds" then
+                  C := (K => Inspect_Bounds, Target => Names (1));
+               else
+                  C := (K => Evaluate, Target => Names (1));
+               end if;
+            end if;
+         elsif Verb = "params" then
+            Need (3); Get_Name (2, 1);
+            if G then
+               C := (K => Params, Param_Name => Names (1), Param_Path => To_Path (Tok (3)));
+            end if;
+         elsif Verb = "setbox" or else Verb = "setcylinder" or else Verb = "setop"
+           or else Verb = "replace" or else Verb = "swap" or else Verb = "settransform"
+         then
+            declare
+               subtype Edit_Kind is Kind range Set_Box .. Swap;
+               EK : Edit_Kind := Swap;
+               M : Natural range 0 .. 2 := 0;
+            begin
+               if Verb = "setbox" then
+                  EK := Set_Box; Need (6);
+               elsif Verb = "setcylinder" then
+                  EK := Set_Cylinder; Need (6);
+               elsif Verb = "setop" then
+                  EK := Set_Op; Need (4);
+               elsif Verb = "replace" then
+                  EK := Replace_Tree; Need (4);
+               elsif Verb = "settransform" then
+                  EK := Set_Transform;
+                  if N < 5 then
+                     G := False;
+                  elsif Lower (Tok (4)) = "translate" then
+                     Need (7); M := 0;
+                     Get_Num (5, 1); Get_Num (6, 2); Get_Num (7, 3);
+                  elsif Lower (Tok (4)) = "rotate" then
+                     Need (6); M := 1; Get_Axis (5); Get_Num (6, 1);
+                  elsif Lower (Tok (4)) = "scale" then
+                     Need (5); M := 2; Get_Num (5, 1);
+                  else
+                     G := False;
+                  end if;
+               else
+                  Need (3);
+               end if;
+               Get_Name (2, 1);
+               if EK = Set_Box or else EK = Set_Cylinder then
+                  Get_Num (4, 1); Get_Num (5, 2);
+                  if EK = Set_Box then
+                     Get_Num (6, 3);
+                  else
+                     Get_Segments (6);
+                  end if;
+               elsif EK = Replace_Tree then
+                  Get_Name (4, 2);
+               elsif EK = Set_Op and then G then
+                  if Lower (Tok (4)) = "union" then
+                     M := 0;
+                  elsif Lower (Tok (4)) = "difference" then
+                     M := 1;
+                  elsif Lower (Tok (4)) = "intersect" then
+                     M := 2;
+                  else
+                     G := False;
+                  end if;
+               end if;
+               if G then
+                  C := (K => EK, Edit_Name => Names (1), Path => To_Path (Tok (3)),
+                        Values => (Nums (1), Nums (2), Nums (3)), Extra => Scalar (Seg),
+                        Mode => M, Edit_Axis => Ax, Source => Names (2));
+               end if;
+            end;
          elsif Verb = "info" then
             Need (2); Get_Name (2, 1);
             if G then
@@ -228,6 +333,9 @@ package body Forge.Commands with SPARK_Mode => Off is
          elsif Verb = "list" then
             Need (1);
             C := (K => List);
+         elsif Verb = "redo" then
+            Need (1);
+            C := (K => Redo);
          elsif Verb = "undo" then
             Need (1);
             C := (K => Undo);
@@ -238,10 +346,14 @@ package body Forge.Commands with SPARK_Mode => Off is
             end if;
          elsif Verb = "save" then
             Need (2);
-            C := (K => Save, File => To_Path (Tok (2)));
+            if G then
+               C := (K => Save, File => To_Path (Tok (2)));
+            end if;
          elsif Verb = "load" then
             Need (2);
-            C := (K => Load, File => To_Path (Tok (2)));
+            if G then
+               C := (K => Load, File => To_Path (Tok (2)));
+            end if;
          else
             Fail ("unknown command: " & Tok (1));
             return;
@@ -251,6 +363,8 @@ package body Forge.Commands with SPARK_Mode => Off is
             Fail ("bad arguments for " & Verb);
          end if;
       end;
+   exception
+      when Constraint_Error => Fail ("argument out of range or path too long");
    end Parse;
 
    -----------
@@ -262,16 +376,28 @@ package body Forge.Commands with SPARK_Mode => Off is
       --  as an integer, anything else as Scalar'Image (17 significant
       --  digits, round-trips through 'Value). Humans and agents both
       --  read these files.
+      package Scalar_IO is new Ada.Text_IO.Float_IO (Scalar);
+      Buffer : String (1 .. 64);
       function Strip (R : String) return String is
         (if R (R'First) = ' ' then R (R'First + 1 .. R'Last) else R);
    begin
       if abs S < 1.0e15 and then S = Scalar'Floor (S) then
          return Strip (Long_Long_Integer'Image (Long_Long_Integer (S)));
       end if;
-      return Strip (Scalar'Image (S));
+      Scalar_IO.Put (Buffer, S, Aft => Scalar'Digits + 2, Exp => 4);
+      return Ada.Strings.Fixed.Trim (Buffer, Ada.Strings.Both);
    end Img;
 
    function Image (C : Command) return String is
+      function Quoted (P : Path_String) return String;
+      function Quoted (P : Path_String) return String is
+         S : constant String := Image (P);
+      begin
+         if (for some Ch of S => Ch in ' ' | ASCII.HT) then
+            return '"' & S & '"';
+         end if;
+         return S;
+      end Quoted;
    begin
       case C.K is
          when Box =>
@@ -299,6 +425,44 @@ package body Forge.Commands with SPARK_Mode => Off is
             return "copy " & Image (C.Cp_Name) & " " & Image (C.From);
          when Delete =>
             return "delete " & Image (C.Target);
+         when Set_Box | Set_Cylinder | Set_Transform | Set_Op | Replace_Tree | Swap =>
+            declare
+               Prefix : constant String :=
+                 (case C.K is when Set_Box => "setbox", when Set_Cylinder => "setcylinder",
+                  when Set_Transform => "settransform", when Set_Op => "setop",
+                  when Replace_Tree => "replace", when others => "swap")
+                 & " " & Image (C.Edit_Name) & " " & Image (C.Path);
+            begin
+               case C.K is
+                  when Set_Box =>
+                     return Prefix & " " & Img (C.Values.X) & " " & Img (C.Values.Y)
+                       & " " & Img (C.Values.Z);
+                  when Set_Cylinder =>
+                     return Prefix & " " & Img (C.Values.X) & " " & Img (C.Values.Y)
+                       & " " & Img (C.Extra);
+                  when Set_Op =>
+                     return Prefix & (case C.Mode is when 0 => " union",
+                                      when 1 => " difference", when others => " intersect");
+                  when Replace_Tree => return Prefix & " " & Image (C.Source);
+                  when Set_Transform =>
+                     if C.Mode = 0 then
+                        return Prefix & " translate " & Img (C.Values.X) & " "
+                          & Img (C.Values.Y) & " " & Img (C.Values.Z);
+                     elsif C.Mode = 1 then
+                        return Prefix & " rotate "
+                          & (case C.Edit_Axis is when X => "x", when Y => "y", when Z => "z")
+                          & " " & Img (C.Values.X);
+                     else
+                        return Prefix & " scale " & Img (C.Values.X);
+                     end if;
+                  when others => return Prefix;
+               end case;
+            end;
+         when Tree => return "tree " & Image (C.Target);
+         when Evaluate => return "evaluate " & Image (C.Target);
+         when Inspect_Bounds => return "bounds " & Image (C.Target);
+         when Params => return "params " & Image (C.Param_Name) & " " & Image (C.Param_Path);
+         when Redo => return "redo";
          when Info =>
             return "info " & Image (C.Target);
          when List =>
@@ -306,11 +470,11 @@ package body Forge.Commands with SPARK_Mode => Off is
          when Undo =>
             return "undo";
          when Export =>
-            return "export " & Image (C.Ex_Name) & " " & Image (C.Ex_Path);
+            return "export " & Image (C.Ex_Name) & " " & Quoted (C.Ex_Path);
          when Save =>
-            return "save " & Image (C.File);
+            return "save " & Quoted (C.File);
          when Load =>
-            return "load " & Image (C.File);
+            return "load " & Quoted (C.File);
          when Comment =>
             return "#";
          when Empty =>

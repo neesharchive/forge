@@ -19,8 +19,19 @@
 --    delete     NAME
 --    list                                     query, not recorded
 --    info       NAME                          query, not recorded
---    export     NAME FILE.stl                 side effect, not recorded
+--    export     NAME FILE.obj                 side effect, not recorded
+--    tree       NAME                          symbolic expression query
+--    bounds     NAME                          conservative symbolic bound
+--    params     NAME PATH                     node parameter query
+--    evaluate   NAME                          validated mesh evaluation
+--    setbox     NAME PATH W H D               edit primitive
+--    setcylinder NAME PATH R H SEGMENTS
+--    settransform NAME PATH translate DX DY DZ | rotate AXIS DEGREES | scale FACTOR
+--    setop      NAME PATH union|difference|intersect
+--    replace    NAME PATH SOURCE              clone replacement subtree
+--    swap       NAME PATH                     exchange Boolean operands
 --    undo                                     meta
+--    redo                                     meta
 --    save       FILE.forge                    meta
 --    load       FILE.forge                    meta
 --    #  anything                              comment, ignored
@@ -33,8 +44,9 @@ package Forge.Commands with SPARK_Mode is
 
    type Kind is
      (Box, Cylinder, Translate, Rotate, Scale,
-      Union, Difference, Intersect, Copy, Delete,
-      List, Info, Export, Undo, Save, Load,
+      Union, Difference, Intersect, Copy,
+      Set_Box, Set_Cylinder, Set_Transform, Set_Op, Replace_Tree, Swap, Delete,
+      List, Info, Tree, Params, Evaluate, Inspect_Bounds, Export, Undo, Redo, Save, Load,
       Comment, Empty);
 
    subtype Modeling is Kind range Box .. Delete;
@@ -74,14 +86,25 @@ package Forge.Commands with SPARK_Mode is
          when Copy =>
             Cp_Name  : Name;
             From     : Name;
-         when Delete | Info =>
+         when Set_Box | Set_Cylinder | Set_Transform | Set_Op | Replace_Tree | Swap =>
+            Edit_Name : Name;
+            Path : Path_String;
+            Values : Vec3 := Origin;
+            Extra : Scalar := 0.0;
+            Edit_Axis : Axis := Z;
+            Mode : Natural range 0 .. 2 := 0;
+            Source : Name;
+         when Params =>
+            Param_Name : Name;
+            Param_Path : Path_String;
+         when Delete | Info | Tree | Evaluate | Inspect_Bounds =>
             Target   : Name;
          when Export =>
             Ex_Name  : Name;
             Ex_Path  : Path_String;
          when Save | Load =>
             File     : Path_String;
-         when List | Undo | Comment | Empty =>
+         when List | Undo | Redo | Comment | Empty =>
             null;
       end case;
    end record;

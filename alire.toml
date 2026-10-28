@@ -1,5 +1,5 @@
 name = "forge"
-description = "Solid modeling with a proven topology kernel"
+description = "Scriptable solid modeling with verified document and numeric helpers"
 version = "0.1.0-dev"
 authors = ["Olivier Henley"]
 maintainers = ["Olivier Henley <henley@adacore.com>"]
@@ -15,3 +15,6 @@ bedrock = "*"
 
 [[pins]]
 bedrock = { url = "https://github.com/GNAT-Academic-Program/bedrock.git" }
+
+[[depends-on]]
+gnatprove = "=16.1.0"

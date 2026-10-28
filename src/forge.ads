@@ -1,4 +1,4 @@
---  forge: solid modeling with a proven topology kernel, driven by text.
+--  forge: solid modeling with verified document and numeric helpers.
 --
 --  Root package: scalars, vectors, names. Pure. No I/O anywhere below
 --  Forge.Session; the kernel computes, the session owns memory, the
@@ -10,8 +10,8 @@ with Bedrock.Names;
 package Forge with SPARK_Mode, Pure is
 
    type Scalar is new Long_Float;
-   --  CAD needs range and 15 digits; fixed point is the wrong tool here.
-   --  What is proved is topology (integers), not floating-point geometry.
+   --  Production mesh coordinates. Forge.Fixed provides a separate grid prototype.
+   --  Proof scope is recorded in docs/VERIFICATION.md; geometry is approximate.
 
    --  Vectors come from bedrock, the GAP foundation crate, instantiated
    --  at forge's precision. Re-exported so `use Forge` is enough.

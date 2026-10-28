@@ -7,3 +7,4 @@ config/
 *.ali
 gnatprove/
 *.stl
+*.obj

@@ -1,0 +1,9 @@
+# forge-format 1 numeric fixed48
+box cube 20 20 20
+cylinder cyl1 3 20 32
+translate cyl1 -5 0 15
+cylinder cyl2 3 20 32
+translate cyl2 5 0 15
+union part1 cube cyl1
+union assembly part1 cyl2
+

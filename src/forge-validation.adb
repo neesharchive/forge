@@ -1,4 +1,3 @@
-with Ada.Numerics.Generic_Elementary_Functions;
 with Forge.Numeric;
 package body Forge.Validation with SPARK_Mode => Off is
    use Mesh;
@@ -106,18 +105,28 @@ package body Forge.Validation with SPARK_Mode => Off is
             E2 : constant Vec3 := T (3) - T (1);
             H : constant Vec3 := Cross (D, E2);
             Det : constant Scalar := Dot (E1, H);
+            --  Each rounded cross-product component contributes <=2 quanta;
+            --  the three dot products contribute another <=3 quanta. Without
+            --  this floor, a nearly zero H can round the relative bound to zero.
+            --  Scale the angular bound by both original edge lengths, before
+            --  cancellation in H; nearly parallel edges must remain parallel.
+            Det_Error : constant Scalar := Quantum *
+              (3.0 + Scalar'(2.0 * (abs E1.X + abs E1.Y + abs E1.Z)));
             S, QV : Vec3;
             U, V, Ray_T : Scalar;
          begin
-            if abs Det <= 1.0e-12 * Length (E1) * Length (H) then
+            if abs Det <= Scalar'Max
+              (Det_Error,
+               Scalar'(Scalar'(16#0.0000000001# * Length (E1)) * Length (D)) * Length (E2))
+            then
                return False;
             end if;
             S := P - T (1); U := Dot (S, H) / Det;
             QV := Cross (S, E1); V := Dot (D, QV) / Det;
             Ray_T := Dot (E2, QV) / Det;
-            return U >= -1.0e-10 and then V >= -1.0e-10
-              and then U + V <= 1.0 + 1.0e-10
-              and then Ray_T >= -1.0e-10 and then Ray_T <= 1.0 + 1.0e-10
+            return U >= -16#0.000000008# and then V >= -16#0.000000008#
+              and then U + V <= 1.0 + 16#0.000000008#
+              and then Ray_T >= -16#0.000000008# and then Ray_T <= 1.0 + 16#0.000000008#
               and then not Allowed (P + D * Ray_T, I, J);
          end Segment_Hit;
       begin
@@ -142,7 +151,7 @@ package body Forge.Validation with SPARK_Mode => Off is
          end if;
          NA := Normal (M, I); NB := Normal (M, J);
          NA := NA * (1.0 / Length (NA)); NB := NB * (1.0 / Length (NB));
-         if Length (Cross (NA, NB)) < 1.0e-10
+         if Length (Cross (NA, NB)) < 16#0.000000008#
            and then abs Dot (NA, B (1) - A (1)) <= Tol
          then
             if abs NA.Y > abs NA.X then
@@ -176,8 +185,8 @@ package body Forge.Validation with SPARK_Mode => Off is
                   end;
                end loop;
             end loop;
-            return Strict_Inside ((A (1) + A (2) + A (3)) * (1.0 / 3.0), B)
-              or else Strict_Inside ((B (1) + B (2) + B (3)) * (1.0 / 3.0), A);
+            return Strict_Inside ((A (1) + A (2) + A (3)) / 3.0, B)
+              or else Strict_Inside ((B (1) + B (2) + B (3)) / 3.0, A);
          end if;
          for K in 1 .. 3 loop
             if Segment_Hit (A (K), A ((if K = 3 then 1 else K + 1)), B)
@@ -191,7 +200,6 @@ package body Forge.Validation with SPARK_Mode => Off is
 
       function Inside (P : Vec3; Shell : Natural) return Boolean is
          --  Solid-angle winding avoids ray/vertex tie-breaking.
-         package Math is new Ada.Numerics.Generic_Elementary_Functions (Scalar);
          Sum : Scalar := 0.0;
          A, B, C : Vec3;
          LA, LB, LC, Num, Den : Scalar;
@@ -202,9 +210,9 @@ package body Forge.Validation with SPARK_Mode => Off is
                C := M.V (M.T (I).C) - P;
                LA := Length (A); LB := Length (B); LC := Length (C);
                Num := Dot (A, Cross (B, C));
-               Den := LA * LB * LC + Dot (A, B) * LC + Dot (B, C) * LA + Dot (C, A) * LB;
+               Den := Scalar'(LA * LB) * LC + Dot (A, B) * LC + Dot (B, C) * LA + Dot (C, A) * LB;
                if Num /= 0.0 or else Den /= 0.0 then
-                  Sum := Sum + 2.0 * Math.Arctan (Num, Den);
+                  Sum := Sum + 2.0 * Atan2 (Num, Den);
                end if;
             end if;
          end loop;
@@ -224,7 +232,7 @@ package body Forge.Validation with SPARK_Mode => Off is
          end if;
       end loop;
       for I in 1 .. M.NT loop
-         if Length (Normal (M, I)) <= Tol * Tol then
+         if Length (Normal (M, I)) <= 0.0 then
             Result := Degenerate_Face; return;
          end if;
       end loop;
@@ -313,7 +321,7 @@ package body Forge.Validation with SPARK_Mode => Off is
                   Depth := Depth + 1;
                end if;
             end loop;
-            if abs Signed_Volume (Triangle_Index (I)) <= Tol ** 3
+            if abs Signed_Volume (Triangle_Index (I)) <= 0.0
               or else (Signed_Volume (Triangle_Index (I)) > 0.0) /= (Depth rem 2 = 0)
             then
                Result := Incorrect_Shell_Orientation; return;

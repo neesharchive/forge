@@ -1,11 +1,46 @@
-with Ada.Unchecked_Conversion;
 with Interfaces;
 
 package body Forge.STL with SPARK_Mode => Off is
-   --  Off for the float-to-bits conversion only.
+   --  Legacy binary32 file fields are encoded using integer arithmetic only.
 
    use type Interfaces.Unsigned_32;
-   function To_Bits is new Ada.Unchecked_Conversion (Float, Interfaces.Unsigned_32);
+   type Wide is range -(2 ** 127) .. 2 ** 127 - 1;
+   for Wide'Size use 128;
+   function To_Bits (V : Scalar) return Interfaces.Unsigned_32;
+   function To_Bits (V : Scalar) return Interfaces.Unsigned_32 is
+      Whole : constant Scalar := Truncated (V);
+      T : constant Wide := abs Wide (Whole) * 2 ** 48
+        + Wide (abs (V - Whole) / Scalar'Small);
+      N : Wide := T;
+      Power : Natural := 0;
+      Mantissa, Divisor, Remainder : Wide;
+      Exponent : Integer;
+      Sign : constant Interfaces.Unsigned_32 := (if V < 0.0 then 16#8000_0000# else 0);
+   begin
+      if T = 0 then
+         return 0;
+      end if;
+      while N >= 2 loop
+         N := N / 2; Power := Power + 1;
+      end loop;
+      Exponent := Integer (Power) - 48 + 127;
+      if Power <= 23 then
+         Mantissa := T * 2 ** (23 - Power);
+      else
+         Divisor := 2 ** (Power - 23);
+         Mantissa := T / Divisor; Remainder := T rem Divisor;
+         if Remainder > Divisor / 2 or else
+           (Remainder = Divisor / 2 and then Mantissa rem 2 /= 0)
+         then
+            Mantissa := Mantissa + 1;
+         end if;
+      end if;
+      if Mantissa = 2 ** 24 then
+         Mantissa := Mantissa / 2; Exponent := Exponent + 1;
+      end if;
+      return Sign or Interfaces.Unsigned_32 (Exponent) * 2 ** 23
+        or Interfaces.Unsigned_32 (Mantissa - 2 ** 23);
+   end To_Bits;
 
    procedure Write (M : Tri_Mesh; Buffer : out Byte_Array; Last : out Natural) is
       P : Positive := Buffer'First;
@@ -26,7 +61,7 @@ package body Forge.STL with SPARK_Mode => Off is
 
       procedure F32 (V : Scalar) is
       begin
-         U32 (To_Bits (Float (V)));
+         U32 (To_Bits (V));
       end F32;
 
       procedure Vec (V : Vec3) is

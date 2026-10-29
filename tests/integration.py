@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent CLI, document and Wavefront OBJ acceptance checks (stdlib only)."""
 import collections
-import math
+from fractions import Fraction
 from pathlib import Path
 import subprocess
 import tempfile
@@ -37,13 +37,13 @@ def obj(path):
         if not words or words[0].startswith('#'):
             continue
         if words[0] == 'v':
-            vertices.append(tuple(map(float, words[1:])))
+            vertices.append(tuple(map(Fraction, words[1:])))
         elif words[0] == 'f':
             faces.append(tuple(int(w.split('/')[0])-1 for w in words[1:]))
         else:
             check(words[0] in ('o', 's'), 'recognized OBJ metadata')
     check(bool(vertices) and bool(faces), 'OBJ has vertices and faces')
-    check(all(len(v) == 3 and all(map(math.isfinite, v)) for v in vertices),
+    check(all(len(v) == 3 and all(isinstance(c, Fraction) for c in v) for v in vertices),
           'OBJ coordinates finite')
     edges = collections.Counter()
     volume = 0
@@ -77,13 +77,16 @@ with tempfile.TemporaryDirectory(prefix='forge-check-') as directory:
         f'load {bad}', 'info cut', f'load "{saved}"', f'export cut {again}',
     ], expected_errors=1)
     check(not side_effect.exists(), 'document cannot execute export side effects')
-    check('cut profile floating' in replies[11], 'failed load preserves original model')
+    check('cut profile fixed48' in replies[11], 'failed load preserves original model')
     check(bracket.read_bytes() == again.read_bytes(), 'undo/redo and save/load preserve OBJ bytes')
     vertices, faces, volume, bounds = obj(bracket)
-    expected = 35200 - (24/2)*4**2*math.sin(2*math.pi/24)*8
-    check(math.isclose(volume, expected, rel_tol=1e-11), 'bracket volume matches polygonal hole')
+    cutter = folder / 'cutter.obj'
+    run(['load examples/primitives.forge', f'export hole {cutter}'])
+    _, _, cutter_volume, _ = obj(cutter)
+    expected = 35200 - cutter_volume * Fraction(8, 10)
+    check(abs(volume - expected) <= abs(expected) / 10**11, 'bracket volume matches polygonal hole')
     check(bounds == ((-30, 30), (-4, 54), (-20, 20)), 'bracket OBJ bounds correct')
-    print(f'Bracket: {len(vertices)} vertices, {len(faces)} triangles, volume {volume:.9f}')
+    print(f'Bracket: {len(vertices)} vertices, {len(faces)} triangles, volume {volume.numerator}/{volume.denominator}')
     previous = bracket.read_bytes()
     replies = run(['box a 2 2 2', 'difference e a a', f'export e {bracket}',
                    f'export a {folder / "bad.stl"}', 'box', 'save', 'load',
@@ -99,12 +102,12 @@ with tempfile.TemporaryDirectory(prefix='forge-check-') as directory:
     mismatch = folder / 'profile.forge'
     mismatch.write_text('# forge-format 1 numeric fixed\nbox b 1 1 1\n')
     run(['box a 1 1 1', f'load {mismatch}', 'info a'], expected_errors=1)
-    for offset in (0.25, 0.75, 1.5):
+    for offset in ('0.25', '0.75', '1.5'):
         out = folder / 'cut.obj'
         run(['box a 2 2 2', 'box b 2 2 2', f'translate b {offset} 0 0',
              'difference d a b', f'export d {out}'])
         _, _, measured, _ = obj(out)
-        check(math.isclose(measured, 4*offset, abs_tol=1e-10), 'parametric box difference volume')
+        check(abs(measured - 4*Fraction(offset)) <= Fraction(1, 10**10), 'parametric box difference volume')
     bounds = run(['box a 4 2 2', 'rotate a z 90', 'bounds a',
                   'difference e a a', 'bounds e', 'evaluate e'])
     check(bounds[2].startswith('ok conservative min'), 'symbolic transformed bounds available')

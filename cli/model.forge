@@ -1,0 +1,5 @@
+# forge-format 1 numeric floating
+box cube 20 20 20
+cylinder cutter 6 30 32
+difference result cube cutter
+

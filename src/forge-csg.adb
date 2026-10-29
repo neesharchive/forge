@@ -125,11 +125,20 @@ package body Forge.CSG with SPARK_Mode => Off is
                end if;
                if C (I) * C (J) = -1 then
                   Den := Dot (N.Normal, P.V (J) - P.V (I));
-                  if abs Den <= 1.0e-30 then
+                  if Den = 0.0 then
                      raise Precision_Error;
                   end if;
                   T := (N.W - Dot (N.Normal, P.V (I))) / Den;
                   V := P.V (I) + (P.V (J) - P.V (I)) * T;
+                  --  Axis planes have exactly representable constraints. Keep
+                  --  their coordinate exact after rounding interpolation.
+                  if N.Normal.Y = 0.0 and then N.Normal.Z = 0.0 then
+                     V.X := N.W / N.Normal.X;
+                  elsif N.Normal.X = 0.0 and then N.Normal.Z = 0.0 then
+                     V.Y := N.W / N.Normal.Y;
+                  elsif N.Normal.X = 0.0 and then N.Normal.Y = 0.0 then
+                     V.Z := N.W / N.Normal.Z;
+                  end if;
                   if not Numeric.Valid (V) then
                      raise Precision_Error;
                   end if;
@@ -295,7 +304,7 @@ package body Forge.CSG with SPARK_Mode => Off is
             P.V (3) := M.V (M.T (I).C);
             P.Normal := Normal (M, I);
             N := Length (P.Normal);
-            if N < Eps * Eps then
+            if N = 0.0 then
                raise Precision_Error;
             end if;
             P.Normal := P.Normal * (1.0 / N);
@@ -348,14 +357,15 @@ package body Forge.CSG with SPARK_Mode => Off is
          while I /= 0 loop
             Mid := Origin;
             for K in 1 .. W.P (I).Count loop
-               Mid := Mid + W.P (I).V (K) * (1.0 / Scalar (W.P (I).Count));
+               Mid := Mid + W.P (I).V (K);
             end loop;
+            Mid := Mid / Scalar (W.P (I).Count);
             Center := Vertex (Mid);
             for K in 1 .. W.P (I).Count loop
                P := W.P (I).V (K);
                Q := W.P (I).V ((if K = W.P (I).Count then 1 else K + 1));
                D := Q - P; Len2 := Dot (D, D);
-               if Len2 <= Eps * Eps then
+               if Len2 = 0.0 then
                   raise Precision_Error;
                end if;
                VA := Vertex (P); VB := Vertex (Q); Prev := 0.0;

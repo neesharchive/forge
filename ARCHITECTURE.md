@@ -65,7 +65,7 @@ expression again to retry; no prior result is returned as if current.
 ## Export
 
 `export NAME FILE.obj` evaluates and validates the expression, writes a Wavefront
-object, decimal vertex positions and 1-based triangular face indices, closes the
+object, exact decimal fixed-point vertex positions and 1-based triangular face indices, closes the
 temporary file and replaces the destination. OBJ preserves indexed connectivity
 and does not force binary32 coordinate conversion. Millimetres are a documented
 convention, not a standardized OBJ unit field. No materials, UVs or explicit normals
@@ -73,11 +73,21 @@ are required; `s off` selects flat shading.
 
 ## Numerical and proof boundaries
 
-Production geometry uses `Long_Float` within a declared domain. The independent
-fixed-grid prototype explores exact integer predicates and rejects unsafe rounded
-constructions. It is not substituted into the BSP by changing one type alias.
+Production geometry uses a 128-bit Ada fixed-point scalar with 48 fractional
+bits. `Forge.Grid` implements proved integer-backed coordinate conversions,
+checked translation, exact quarter turns and rounded scaling. General geometry
+uses fixed-point vector and elementary functions; no floating-point boundary is
+used for cylinders, rotations, validation, parsing or OBJ formatting.
 
-SPARK verification covers selected numeric, bounded-tree and history contracts;
-whole-project flow analysis checks the SPARK portions. Several existing and new
-bodies are explicitly outside SPARK. Passing these gates does not establish exact
-Boolean geometry. See `docs/VERIFICATION.md`.
+BSP constructions remain approximate and use a declared tolerance. Input and
+scale rounding use nearest/ties-to-even; kernel multiplication/division use the
+qualified GNAT ordinary fixed-point implementation. Shared vertices are still
+canonicalized and every output passes the geometric validator. Axis-plane split
+coordinates are preserved exactly; polygon centers use one division after summing.
+The validator's parallel test includes a quantization error floor.
+
+The old 2^-16 mm `Forge.Fixed_Geometry` experiment is separate from production.
+SPARK verifies selected arithmetic, bounded-tree and history properties; the
+complete fixed-point Boolean evaluator and elementary-function approximation
+accuracy are tested, not formally proved. See `docs/NUMERICS.md` and
+`docs/VERIFICATION.md` for the current contract and reproduced evidence.

@@ -1,0 +1,234 @@
+=========================
+Summary of SPARK analysis
+=========================
+
+-----------------------------------------------------------------------------------------------------------------------
+SPARK Analysis results        Total        Flow                                          Provers   Justified   Unproved
+-----------------------------------------------------------------------------------------------------------------------
+Data Dependencies                 .           .                                                .           .          .
+Flow Dependencies                 .           .                                                .           .          .
+Initialization                   33          33                                                .           .          .
+Non-Aliasing                      .           .                                                .           .          .
+Run-time Checks                  70           .    70 (CVC5 10%, Trivial 1%, Z3 88%, altergo 2%)           .          .
+Assertions                        .           .                                                .           .          .
+Functional Contracts             17           .                17 (CVC5 11%, Trivial 5%, Z3 84%)           .          .
+LSP Verification                  .           .                                                .           .          .
+Termination                      69          66                                           3 (Z3)           .          .
+Concurrency                       .           .                                                .           .          .
+-----------------------------------------------------------------------------------------------------------------------
+Total                           189    99 (52%)                                         90 (48%)           .          .
+
+
+max steps used for successful proof: 375
+
+============================
+Most difficult proved checks
+============================
+
+No check found with max time greater than 1 second
+
+========================
+Detailed analysis report
+========================
+
+Analyzed 27 units
+in unit bedrock, 16 subprograms and packages out of 19 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock at bedrock.ads:24 skipped; body is SPARK_Mode => Off
+  Bedrock."*" at bedrock.ads:42 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock."*" at bedrock.ads:43 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock."+" at bedrock.ads:39 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock."-" at bedrock.ads:40 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock."-" at bedrock.ads:41 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock."/" at bedrock.ads:44 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Center at bedrock.ads:61 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Clamp at bedrock.ads:69 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Contains at bedrock.ads:63 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Dimensions at bedrock.ads:60 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Dot at bedrock.ads:46 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Length at bedrock.ads:48 skipped; body is SPARK_Mode => Off
+  Bedrock.Length_Squared at bedrock.ads:47 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Lerp at bedrock.ads:53 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Normalized at bedrock.ads:49 skipped; body is SPARK_Mode => Off
+  Bedrock.Overlaps at bedrock.ads:65 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Perpendicular at bedrock.ads:51 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Position at bedrock.ads:59 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit bedrock-buffers, 8 subprograms and packages out of 8 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock.Buffers at bedrock-buffers.ads:10 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Blit at bedrock-buffers.ads:41 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Fill at bedrock-buffers.ads:39 flow analyzed (0 errors, 0 checks, 1 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Get at bedrock-buffers.ads:33 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Height at bedrock-buffers.ads:31 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Make at bedrock-buffers.ads:27 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Set at bedrock-buffers.ads:36 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Buffers.Width at bedrock-buffers.ads:30 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit bedrock-colors, 7 subprograms and packages out of 7 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock.Colors at bedrock-colors.ads:5 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.Blend at bedrock-colors.ads:49 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.Blend.L at bedrock-colors.adb:11 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.Fade at bedrock-colors.ads:52 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.M at bedrock-colors.adb:3 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.Modulate at bedrock-colors.ads:46 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Colors.Same_RGB at bedrock-colors.ads:43 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit bedrock-generic_fixed_vectors, 0 subprograms and packages out of 0 analyzed
+flow analysis and proof skipped for this unit (generic unit is not analyzed)
+in unit bedrock-generic_vectors, 0 subprograms and packages out of 0 analyzed
+flow analysis and proof skipped for this unit (generic unit is not analyzed)
+in unit bedrock-input, 7 subprograms and packages out of 7 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock.Input at bedrock-input.ads:11 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Button_Event at bedrock-input.ads:158 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Clear at bedrock-input.ads:185 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Key_Event at bedrock-input.ads:149 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Move_Event at bedrock-input.ads:155 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Push at bedrock-input.ads:181 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Input.Resize_Event at bedrock-input.ads:163 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit bedrock-names, 6 subprograms and packages out of 6 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock.Names at bedrock-names.ads:5 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Names.Image at bedrock-names.ads:20 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Names.Image at bedrock-names.ads:43 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Names.Is_Empty at bedrock-names.ads:22 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Names.To_Name at bedrock-names.ads:16 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Names.To_Path at bedrock-names.ads:39 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit bedrock-responses, 0 subprograms and packages out of 0 analyzed
+flow analysis and proof skipped for this unit (generic unit is not analyzed)
+in unit bedrock-screen, 4 subprograms and packages out of 4 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Bedrock.Screen at bedrock-screen.ads:6 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Screen.Contains at bedrock-screen.ads:24 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Screen.To_Point at bedrock-screen.ads:38 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Bedrock.Screen.To_Vector at bedrock-screen.ads:37 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit forge, 7 subprograms and packages out of 14 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge at forge.ads:9 skipped; body is SPARK_Mode => Off
+  Forge."*" at forge.ads:27 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge."+" at forge.ads:24 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge."-" at forge.ads:25 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge."-" at forge.ads:26 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge."/" at forge.ads:28 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Atan2 at forge.ads:43 skipped; body is SPARK_Mode => Off
+  Forge.Cross at forge.ads:31 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Dot at forge.ads:29 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Length at forge.ads:35 skipped; body is SPARK_Mode => Off
+  Forge.Normalized at forge.ads:36 skipped; body is SPARK_Mode => Off
+  Forge.Sin_Cos at forge.ads:41 skipped; body is SPARK_Mode => Off
+  Forge.Sqrt at forge.ads:39 skipped; body is SPARK_Mode => Off
+  Forge.Truncated at forge.ads:37 skipped; body is SPARK_Mode => Off
+in unit forge-commands, 1 subprograms and packages out of 4 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Commands at forge-commands.ads:43 skipped; body is SPARK_Mode => Off
+  Forge.Commands.Image at forge-commands.ads:62 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Commands.Image at forge-commands.ads:119 skipped; body is SPARK_Mode => Off
+  Forge.Commands.Parse at forge-commands.ads:114 skipped; body is SPARK_Mode => Off
+in unit forge-csg, 1 subprograms and packages out of 3 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.CSG at forge-csg.ads:8 skipped; body is SPARK_Mode => Off
+  Forge.CSG.Apply at forge-csg.ads:21 skipped; body is SPARK_Mode => Off
+  Forge.CSG.Workspace at forge-csg.ads:52 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit forge-fixed, 4 subprograms and packages out of 4 analyzed
+  Forge.Fixed at forge-fixed.ads:3 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Fixed.Divide_Rounded at forge-fixed.ads:15 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (10 checks)
+  Forge.Fixed.Quarter_Z at forge-fixed.ads:10 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Fixed.Translate at forge-fixed.ads:12 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (4 checks)
+in unit forge-fixed_geometry, 0 subprograms and packages out of 4 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Fixed_Geometry at forge-fixed_geometry.ads:3 skipped; body is SPARK_Mode => Off
+  Forge.Fixed_Geometry.Classify at forge-fixed_geometry.ads:5 skipped; body is SPARK_Mode => Off
+  Forge.Fixed_Geometry.Parse_Decimal at forge-fixed_geometry.ads:7 skipped; body is SPARK_Mode => Off
+  Forge.Fixed_Geometry.Split_Edge at forge-fixed_geometry.ads:9 skipped; body is SPARK_Mode => Off
+in unit forge-grid, 8 subprograms and packages out of 8 analyzed
+  Forge.Grid at forge-grid.ads:3 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Grid.Norm_Squared at forge-grid.ads:26 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Grid.Quarter_Turn at forge-grid.ads:29 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (1 checks)
+  Forge.Grid.Rounded at forge-grid.ads:34 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (14 checks)
+  Forge.Grid.Scale at forge-grid.ads:43 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (5 checks)
+  Forge.Grid.To_Scalar at forge-grid.ads:16 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (5 checks)
+  Forge.Grid.To_Tick at forge-grid.ads:13 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (6 checks)
+  Forge.Grid.Translate at forge-grid.ads:20 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (4 checks)
+in unit forge-history, 5 subprograms and packages out of 5 analyzed
+  Forge.History at forge-history.ads:2 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.History.Commit_Edit at forge-history.ads:9 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (2 checks)
+  Forge.History.Redo at forge-history.ads:19 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (2 checks)
+  Forge.History.Undo at forge-history.ads:14 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (2 checks)
+  Forge.History.Valid at forge-history.ads:8 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+in unit forge-mesh, 14 subprograms and packages out of 14 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Mesh at forge-mesh.ads:7 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Add_Triangle at forge-mesh.ads:48 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Add_Vertex at forge-mesh.ads:42 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Bounds at forge-mesh.ads:90 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Clear at forge-mesh.ads:39 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Copy at forge-mesh.ads:55 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Edge at forge-mesh.adb:60 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Is_Solid at forge-mesh.ads:73 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Is_Watertight at forge-mesh.ads:65 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Is_Watertight.Less at forge-mesh.adb:82 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Is_Watertight.Sift at forge-mesh.adb:83 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Normal at forge-mesh.ads:86 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Volume at forge-mesh.ads:81 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.Mesh.Well_Formed at forge-mesh.ads:27 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+in unit forge-model, 7 subprograms and packages out of 7 analyzed
+  Forge.Model at forge-model.ads:3 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Model.Add at forge-model.ads:16 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (3 checks)
+  Forge.Model.Clone at forge-model.ads:22 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Model.Clone.Copy_Node at forge-model.adb:18 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (8 checks)
+  Forge.Model.Resolve at forge-model.ads:27 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (5 checks)
+  Forge.Model.Valid_Subtree at forge-model.ads:25 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Model.Valid_Subtree.Walk at forge-model.adb:56 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (13 checks)
+in unit forge-model_bounds, 0 subprograms and packages out of 2 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Model_Bounds at forge-model_bounds.ads:3 skipped; body is SPARK_Mode => Off
+  Forge.Model_Bounds.Evaluate at forge-model_bounds.ads:8 skipped; body is SPARK_Mode => Off
+in unit forge-numeric, 4 subprograms and packages out of 4 analyzed
+  Forge.Numeric at forge-numeric.ads:2 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Numeric.Close at forge-numeric.ads:8 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (6 checks)
+  Forge.Numeric.Valid at forge-numeric.ads:5 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+  Forge.Numeric.Valid at forge-numeric.ads:6 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements) and proved (0 checks)
+in unit forge-obj, 0 subprograms and packages out of 0 analyzed
+proof skipped for this unit (only flow analysis was requested)
+in unit forge-primitives, 0 subprograms and packages out of 3 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Primitives at forge-primitives.ads:7 skipped; body is SPARK_Mode => Off
+  Forge.Primitives.Box at forge-primitives.ads:9 skipped; body is SPARK_Mode => Off
+  Forge.Primitives.Cylinder at forge-primitives.ads:16 skipped; body is SPARK_Mode => Off
+in unit forge-session, 0 subprograms and packages out of 16 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Session.Apply at forge-session.adb:55 skipped; SPARK_Mode => Off
+  Forge.Session.Describe at forge-session.adb:404 skipped; SPARK_Mode => Off
+  Forge.Session.Dispose at forge-session.adb:24 skipped; SPARK_Mode => Off
+  Forge.Session.Do_Export at forge-session.adb:469 skipped; SPARK_Mode => Off
+  Forge.Session.Evaluate_Node at forge-session.adb:284 skipped; SPARK_Mode => Off
+  Forge.Session.Evaluate_Solid at forge-session.adb:361 skipped; SPARK_Mode => Off
+  Forge.Session.Find at forge-session.adb:41 skipped; SPARK_Mode => Off
+  Forge.Session.Free_Meshgp321.Free_Mesh at forge-session.adb:16 skipped; SPARK_Mode => Off
+  Forge.Session.Free_Scratchgp532.Free_Scratch at forge-session.adb:19 skipped; SPARK_Mode => Off
+  Forge.Session.Free_Stategp403.Free_State at forge-session.adb:17 skipped; SPARK_Mode => Off
+  Forge.Session.Responses.Append at bedrock-responses.ads:24, instantiated at forge-session.ads:26 skipped; SPARK_Mode => Off
+  Forge.Session.Responses.Err at bedrock-responses.ads:31, instantiated at forge-session.ads:26 skipped; SPARK_Mode => Off
+  Forge.Session.Responses.Image at bedrock-responses.ads:18, instantiated at forge-session.ads:26 skipped; SPARK_Mode => Off
+  Forge.Session.Responses.Ok at bedrock-responses.ads:27, instantiated at forge-session.ads:26 skipped; SPARK_Mode => Off
+  Forge.Session.Responses.Set at bedrock-responses.ads:20, instantiated at forge-session.ads:26 skipped; SPARK_Mode => Off
+  Forge.Session.Write_File at forge-session.adb:438 skipped; SPARK_Mode => Off
+in unit forge-stl, 1 subprograms and packages out of 3 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.STL at forge-stl.ads:10 skipped; body is SPARK_Mode => Off
+  Forge.STL.Size at forge-stl.ads:15 flow analyzed (0 errors, 0 checks, 0 warnings and 0 pragma Assume statements)
+  Forge.STL.Write at forge-stl.ads:18 skipped; body is SPARK_Mode => Off
+in unit forge-text, 0 subprograms and packages out of 3 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Text at forge-text.ads:2 skipped; body is SPARK_Mode => Off
+  Forge.Text.Number at forge-text.ads:3 skipped; body is SPARK_Mode => Off
+  Forge.Text.Parse at forge-text.ads:5 skipped; body is SPARK_Mode => Off
+in unit forge-transform, 0 subprograms and packages out of 4 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Transform at forge-transform.ads:7 skipped; body is SPARK_Mode => Off
+  Forge.Transform.Rotate at forge-transform.ads:17 skipped; body is SPARK_Mode => Off
+  Forge.Transform.Scale at forge-transform.ads:13 skipped; body is SPARK_Mode => Off
+  Forge.Transform.Translate at forge-transform.ads:9 skipped; body is SPARK_Mode => Off
+in unit forge-validation, 0 subprograms and packages out of 2 analyzed
+proof skipped for this unit (only flow analysis was requested)
+  Forge.Validation at forge-validation.ads:3 skipped; body is SPARK_Mode => Off
+  Forge.Validation.Check at forge-validation.ads:8 skipped; body is SPARK_Mode => Off

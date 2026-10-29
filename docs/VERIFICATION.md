@@ -1,77 +1,96 @@
-# Verification evidence
+# Fixed48 verification evidence
 
-Verified October 27, 2026 on macOS ARM64 using GNAT 16.1.0, GNATprove 16.1.0
-and GPRbuild 26.0.1. The in-place build uses the already-installed macOS 15 SDK
-because GNAT 16's linker rejected the newer Xcode SDK library stubs. The verification
-script selects that compatible SDK locally without changing global settings. The installed project is verified again by the installation
-step. Reproduce with `tools/verify.sh` (`ALR=/absolute/path/to/alr` if necessary).
+Verified October 28, 2026 on macOS ARM64 with GNAT 16.1.0, GNATprove 16.1.0
+and GPRbuild 26.0.1. The complete `tools/verify.sh` release gate exited zero.
+The script selects the installed macOS 15 SDK locally for linker compatibility.
+Linux/macOS CI now runs the same fixed-point gates; remote CI results are not
+claimed here.
 
-## Results
+## Executed results
 
 | Gate | Result |
 |---|---|
-| Library, test executable and CLI builds | Pass with assertions, style checks and warnings as errors |
-| Ada regression suite | 168 checks pass |
-| Independent CLI/document/OBJ suite | 1,708 assertions pass |
-| Whole-project SPARK flow | 100 checks pass; zero unproved checks |
-| Selected SPARK contract/runtime-safety proof | 152 total flow/proof checks pass; zero unproved checks |
-| Bracket qualification | 24, 64, 128 and 256 segment cylinders pass full evaluation |
+| Library, Ada tests and CLI builds | Pass with assertions, style checks and warnings as errors |
+| Ada regression suite | 199 checks pass |
+| Exact-rational CLI/document/OBJ integration | 1,811 assertions pass |
+| Fixed-only source/object and end-to-end acceptance | 91 checks pass |
+| Bracket Boolean qualification | 24, 64, 128 and 256 segment cylinders pass |
+| Whole-project SPARK flow | 99 checks pass; zero unproved |
+| Selected SPARK proof run with forced analysis | 189 combined checks pass; zero unproved |
 
-The 152 total is the proof report's combined count, including flow checks; it does
-not mean 152 independent geometric theorems. The full-flow run retains one warning
-in the unmodified Bedrock dependency (`Buffers.Fill` has an unused incoming value).
-There are no unproved checks. Logs and the detailed coverage report are in
-[`verification/`](verification/). Source hashes are in `verification/sources.json`.
+The final combined report contains 99 flow checks and 90 prover checks, including
+70 runtime checks, 17 functional-contract checks and three prover termination
+checks. These counts are not independent geometric theorems. The new production
+`Forge.Grid` contributes 35 successful prover checks in the detailed report.
+The unchanged Bedrock `Buffers.Fill` unused-input warning remains.
 
-## Proof scope
+Current evidence:
 
-The proof gate selects `Forge.Fixed`, `Forge.Numeric`, `Forge.Model` and
-`Forge.History`. Covered properties include bounded allocation/count updates,
-index safety and recursion/loop safety in model operations, domain-bounded numeric
-comparison, exact quarter-turn arithmetic, checked fixed-grid translation,
-integer rounding safety/output bounds, and undo/redo cursor transition contracts.
-The rounding algorithm's nearest/tie behavior also has explicit positive and
-negative regression cases; no general geometric exactness conclusion follows.
+- [Complete successful run](verification/fixed48-full-run.log)
+- [Detailed proof report](verification/fixed48-gnatprove.out)
+- [Source SHA-256 snapshot](verification/fixed48-sources.json)
 
-Whole-project flow analysis checks SPARK portions of Forge and instantiated
-Bedrock dependencies. Parser/image, session/file I/O, OBJ encoding, BSP clipping,
-geometric validation, fixed-geometry feasibility code and existing primitive/
-transform implementations have bodies outside SPARK. They are tested, not formally
-proved. The edge sorter is flow-checked; its equivalence to the mathematical
-watertightness predicate is not a proved functional theorem in this release.
+The other logs and `benchmarks.json` predate conversion and describe the previous
+floating backend. They are historical evidence, not current performance claims.
 
-## Independent acceptance
+## New SPARK scope
 
-The OBJ reader is Python standard-library code independent of the Ada serializer.
-It checks finite coordinates, 1-based triangular indices, opposite oriented edge
-pairs, analytic box volumes and the bracket's tessellated-hole volume/bounds.
-Undo/redo and save/load reproduce identical OBJ bytes. Failed loads preserve the
-current model and cannot execute export side effects. Empty/failed exports retain
-an existing destination. Tests also cover profile mismatch, name/depth capacity,
-redo preservation on failed edits, rotated subtraction and symbolic bounds.
+`Forge.Grid` is used by production translation, scaling and quarter-turn mesh
+rotation. Its proved properties include:
 
-Ada regressions cover primitive geometry, command round trips, all three Booleans,
-empty results, identity, disjoint components, cavities, face contact, unsupported
-edge contact, subtree edits, fixed-grid arithmetic and geometric rejection of
-collapsed faces, inverted shells and overlapping closed shells.
+- Exact fixed-coordinate/integer-tick round trips within +/-10,000 mm.
+- Translation arithmetic safety, exact successful sums and unchanged failure state.
+- Exact squared-distance preservation under quarter turns on each axis.
+- Wide-product range safety for scaling.
+- Rounded-quotient error at most half a tick, with even results at exact ties.
+- Successful scaling equals that rounded quotient; failed scaling preserves input.
 
-## Performance and limits
+The selected proof command also retains `Forge.Fixed`, `Forge.Numeric`,
+`Forge.Model` and `Forge.History`. No `pragma Assume`, suppressed checks or weakened
+proof contracts were added to obtain these results.
 
-The single-sample fresh-process bracket measurements are in `benchmarks.json`.
-Observed evaluation times: approximately 0.6 s (24 segments), 1.9 s (64), 8.8 s
-(128), 51.9 s (256). Full geometric validation is a bounded quadratic reference
-implementation. These are local measurements, not cross-platform guarantees.
-BSP scratch is about 100 MiB and allocated lazily only for Boolean evaluation;
-primitive-only queries do not allocate it. Capacity failures identify the bounded
-resource. Maximum validated output is 20,000 triangles.
+The complete Boolean algorithm is not formally proved. Root elementary functions,
+BSP clipping/reconstruction, geometric validation, parsing/formatting, session
+I/O and compatibility STL encoding are tested Ada outside SPARK. Whole-project
+flow checks the SPARK portions only. In particular, the accuracy of the Taylor
+approximations and arbitrary-mesh Boolean correctness are not proof claims.
 
-Production remains approximate floating-point BSP. The fixed-grid implementation
-is a separate tested feasibility backend, not a production fixed-point BSP engine.
-Exact rational mesh Booleans and a graphical/OpenGL viewport are not included.
-The implemented interactive front end is `forge_cli --inspect`.
+## Independent arithmetic and geometry checks
 
-An external graphical OBJ viewer and other OS builds were not run locally.
-Linux/macOS CI jobs are configured, but their remote results are not claimed here.
+`tests/integration.py` reads OBJ using exact Python fractions. It checks indexed
+triangle connectivity, reverse edge pairs, bounds, box volumes and bracket volume
+against the actual quantized cutter. Save/load and undo/redo preserve OBJ bytes.
+Failed loads, evaluations and exports preserve the required document/file state.
 
-Baseline Forge commit: `59051fdb4e333a32e4dfda2d1c898a66cb5d5904`.
-Bedrock commit inspected/built: `342d5bdd0b61f65e31a18f9b0b39cf6c2d353647`.
+`tests/fixed_point.py` bans floating types/libraries in Forge source and numeric
+floating instructions/conversions in compiled Forge objects using `otool` on
+macOS or `objdump` on Linux. It checks exact grid membership, one-tick export,
+positive/negative tie quantization, profile rejection, exact replay, noncardinal
+rotations against an independent rational Taylor series, and all four bracket
+qualifications. This audit covers Forge objects and the modeled numeric path;
+it does not claim that unrelated linked runtime or Bedrock code has no floats.
+
+Ada checks additionally cover 2,000 generated exact tick text round trips,
+coordinate endpoints, translation/scaling overflow, quarter-turn cycles, square
+roots, trigonometric quadrants, integer-only binary STL encoding, the user's
+20 mm cube/6 mm radius cutter example, invalid geometry and failed bounds queries.
+
+## Reproduce
+
+```sh
+tools/verify.sh
+```
+
+The script builds all three projects, runs both Python suites and the Ada tests,
+then executes:
+
+```sh
+alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
+alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 -f \
+  --checks-as-errors=on -u forge-fixed.adb forge-grid.adb forge-model.adb \
+  forge-numeric.ads forge-history.adb
+```
+
+General rotations and Booleans remain tolerance-based fixed-point approximations.
+Validated output and bounded failures do not imply exact analytic CAD geometry.
+See [numeric policy](NUMERICS.md) for representation, rounding and compatibility.

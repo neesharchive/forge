@@ -4,37 +4,44 @@
 --  Forge.Session; the kernel computes, the session owns memory, the
 --  front ends (cli/, ui/) talk to the session in lines of text.
 
-with Bedrock.Generic_Vectors;
 with Bedrock.Names;
 
 package Forge with SPARK_Mode, Pure is
 
-   type Scalar is new Long_Float;
-   --  Production mesh coordinates. Forge.Fixed provides a separate grid prototype.
-   --  Proof scope is recorded in docs/VERIFICATION.md; geometry is approximate.
+   --  Fixed binary millimetres. Wide storage also accommodates measures and
+   --  intermediate products; public coordinate bounds remain +/-10,000 mm.
+   type Scalar is delta 2.0 ** (-48) range -(2.0 ** 63) .. 2.0 ** 63 - 1.0;
+   for Scalar'Small use 2.0 ** (-48);
+   for Scalar'Size use 128;
+   Quantum : constant Scalar := 16#0.000000000001#;
 
-   --  Vectors come from bedrock, the GAP foundation crate, instantiated
-   --  at forge's precision. Re-exported so `use Forge` is enough.
-   package Geometry is new Bedrock.Generic_Vectors (Scalar);
+   type Vec3 is record
+      X, Y, Z : Scalar := 0.0;
+   end record;
+   Origin : constant Vec3 := (0.0, 0.0, 0.0);
+   type Axis is (X, Y, Z);
 
-   subtype Vec3 is Geometry.Vector3;
-   Origin : Vec3 renames Geometry.Zero3;
-
-   function "=" (A, B : Vec3) return Boolean renames Geometry."=";
-   function "+" (A, B : Vec3) return Vec3 renames Geometry."+";
-   function "-" (A, B : Vec3) return Vec3 renames Geometry."-";
-   function "-" (A : Vec3) return Vec3 renames Geometry."-";
-   function "*" (A : Vec3; S : Scalar) return Vec3 renames Geometry."*";
-   function Dot (A, B : Vec3) return Scalar renames Geometry.Dot;
-   function Cross (A, B : Vec3) return Vec3 renames Geometry.Cross;
-   function Length (A : Vec3) return Scalar renames Geometry.Length;
-   function Normalized (A : Vec3) return Vec3 renames Geometry.Normalized;
-
-   subtype Axis is Geometry.Axis;
-   function X return Axis renames Geometry.X;
-   function Y return Axis renames Geometry.Y;
-   function Z return Axis renames Geometry.Z;
-   function "=" (A, B : Axis) return Boolean renames Geometry."=";
+   function "+" (A, B : Vec3) return Vec3 is ((A.X + B.X, A.Y + B.Y, A.Z + B.Z));
+   function "-" (A, B : Vec3) return Vec3 is ((A.X - B.X, A.Y - B.Y, A.Z - B.Z));
+   function "-" (A : Vec3) return Vec3 is ((-A.X, -A.Y, -A.Z));
+   function "*" (A : Vec3; S : Scalar) return Vec3 is ((A.X * S, A.Y * S, A.Z * S));
+   function "/" (A : Vec3; S : Scalar) return Vec3 is ((A.X / S, A.Y / S, A.Z / S));
+   function Dot (A, B : Vec3) return Scalar is
+     (Scalar'(A.X * B.X) + Scalar'(A.Y * B.Y) + Scalar'(A.Z * B.Z));
+   function Cross (A, B : Vec3) return Vec3 is
+     ((Scalar'(A.Y * B.Z) - Scalar'(A.Z * B.Y),
+       Scalar'(A.Z * B.X) - Scalar'(A.X * B.Z),
+       Scalar'(A.X * B.Y) - Scalar'(A.Y * B.X)));
+   function Length (A : Vec3) return Scalar;
+   function Normalized (A : Vec3) return Vec3;
+   function Truncated (V : Scalar) return Scalar;
+   --  Integral part, truncated toward zero using integer conversion.
+   function Sqrt (V : Scalar) return Scalar;
+   --  Nonnegative fixed-point square root; rejects negative arguments.
+   procedure Sin_Cos (Degrees : Scalar; S, C : out Scalar);
+   --  Fixed-point range reduction and Taylor evaluation; exact quarter turns.
+   function Atan2 (Y, X : Scalar) return Scalar;
+   --  Fixed-point signed angle in radians, in [-pi, pi].
 
    ---------------------------------------------------------------------
    --  Names: identifiers for solids in a session. Bedrock's bounded

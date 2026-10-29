@@ -1,0 +1,522 @@
+Note: Building forge=0.1.0-dev/forge.gpr...
+Compile
+   [Ada]          forge-transform.adb
+   [Ada]          forge-commands.adb
+   [Ada]          forge-model.adb
+   [Ada]          forge-grid.adb
+   [Ada]          forge-numeric.ads
+   [Ada]          forge-stl.adb
+   [Ada]          forge-session.adb
+   [Ada]          forge-primitives.adb
+   [Ada]          forge-csg.adb
+   [Ada]          forge-mesh.adb
+   [Ada]          forge-history.adb
+   [Ada]          forge-text.adb
+   [Ada]          forge.adb
+   [Ada]          forge-fixed.adb
+   [Ada]          forge-validation.adb
+   [Ada]          forge-fixed_geometry.adb
+   [Ada]          forge-obj.adb
+   [Ada]          forge-model_bounds.adb
+Build Libraries
+   [gprlib]       forge.lexch
+   [archive]      libforge.a
+   [index]        libforge.a
+Success: Build finished successfully in 1.29 seconds.
+Note: Building forge_tests=0.1.0-dev/tests.gpr...
+Compile
+   [Ada]          forge-transform.adb
+   [Ada]          forge-commands.adb
+   [Ada]          forge-model.adb
+   [Ada]          forge-grid.adb
+   [Ada]          forge-numeric.ads
+   [Ada]          forge-stl.adb
+   [Ada]          forge-session.adb
+   [Ada]          forge-primitives.adb
+   [Ada]          forge-csg.adb
+   [Ada]          forge-mesh.adb
+   [Ada]          forge-history.adb
+   [Ada]          forge-text.adb
+   [Ada]          forge.adb
+   [Ada]          forge-fixed.adb
+   [Ada]          forge-validation.adb
+   [Ada]          forge-fixed_geometry.adb
+   [Ada]          forge-obj.adb
+   [Ada]          forge-model_bounds.adb
+Build Libraries
+   [gprlib]       forge.lexch
+   [archive]      libforge.a
+   [index]        libforge.a
+Bind
+   [gprbind]      tests.bexch
+   [Ada]          tests.ali
+Link
+   [link]         tests.adb
+Success: Build finished successfully in 1.41 seconds.
+PASS  empty is well formed
+PASS  empty is not solid
+PASS  tetra well formed
+PASS  tetra watertight
+PASS  tetra volume 1/6
+PASS  flipped triangle is not watertight
+PASS  open mesh is not watertight
+PASS  box ok
+PASS  box is solid
+PASS  box volume
+PASS  box centred
+PASS  cylinder ok
+PASS  cylinder is solid
+PASS  cylinder counts
+PASS  cylinder volume approx pi*2
+PASS  translate keeps volume
+PASS  rotate keeps solid
+PASS  scale x2 gives x8 volume
+PASS  stl size 84 + 50*12
+PASS  stl wrote exactly Size
+PASS  stl count field = 12
+PASS  integer STL encoding of negative unit normal
+PASS  integer STL encoding of negative half coordinate
+PASS  parse: box a 1 2.5 3
+PASS  round trip: box a 1 2.5 3
+PASS  parse: cylinder c 1 2 12
+PASS  round trip: cylinder c 1 2 12
+PASS  parse: translate a -1 0 2.25
+PASS  round trip: translate a -1 0 2.25
+PASS  parse: rotate a y 45
+PASS  round trip: rotate a y 45
+PASS  parse: scale a 0.5
+PASS  round trip: scale a 0.5
+PASS  parse: union u a c
+PASS  round trip: union u a c
+PASS  parse: difference d a c
+PASS  round trip: difference d a c
+PASS  parse: copy k a
+PASS  round trip: copy k a
+PASS  parse: delete k
+PASS  round trip: delete k
+PASS  parse: setbox cut L 4 5 6
+PASS  round trip: setbox cut L 4 5 6
+PASS  parse: setcylinder cut R 2 8 24
+PASS  round trip: setcylinder cut R 2 8 24
+PASS  parse: settransform cut R translate 1 2 3
+PASS  round trip: settransform cut R translate 1 2 3
+PASS  parse: settransform cut R rotate z 31
+PASS  round trip: settransform cut R rotate z 31
+PASS  parse: settransform cut R scale 2
+PASS  round trip: settransform cut R scale 2
+PASS  parse: setop cut . difference
+PASS  round trip: setop cut . difference
+PASS  parse: swap cut .
+PASS  round trip: swap cut .
+PASS  parse: replace cut L k
+PASS  round trip: replace cut L k
+PASS  too few args rejected
+PASS  bad name rejected
+PASS  unknown verb rejected
+PASS  comment
+PASS  blank
+PASS  segments < 3 rejected
+PASS  session box
+PASS  info reports solid
+PASS  copy
+PASS  unknown solid is an error
+PASS  csg expression created
+PASS  csg evaluates
+PASS  undo removes Boolean
+PASS  undo removes copy
+PASS  undo to empty
+PASS  undo on empty is an error
+PASS  bad scale rejected, not recorded
+PASS  mesh view
+PASS  history line
+PASS  box a 2 2 2
+PASS  box b 2 2 2
+PASS  translate b 1 0 0
+PASS  union u a b
+PASS  u validated mesh
+PASS  u expected volume
+PASS  intersect i a b
+PASS  i validated mesh
+PASS  i expected volume
+PASS  difference d a b
+PASS  d validated mesh
+PASS  d expected volume
+PASS  difference e a a
+PASS  e validated mesh
+PASS  e expected volume
+PASS  union ident a a
+PASS  ident validated mesh
+PASS  ident expected volume
+PASS  intersect ident_i a a
+PASS  ident_i validated mesh
+PASS  ident_i expected volume
+PASS  difference e2 e a
+PASS  e2 validated mesh
+PASS  e2 expected volume
+PASS  union fromempty e a
+PASS  fromempty validated mesh
+PASS  fromempty expected volume
+PASS  box far 2 2 2
+PASS  translate far 3 0 0
+PASS  union disjoint a far
+PASS  disjoint validated mesh
+PASS  disjoint expected volume
+PASS  intersect disjoint_i a far
+PASS  disjoint_i validated mesh
+PASS  disjoint_i expected volume
+PASS  difference disjoint_d a far
+PASS  disjoint_d validated mesh
+PASS  disjoint_d expected volume
+PASS  box outer 4 4 4
+PASS  difference cavity outer a
+PASS  cavity validated mesh
+PASS  cavity expected volume
+PASS  box touch 2 2 2
+PASS  translate touch 2 0 0
+PASS  union face a touch
+PASS  face validated mesh
+PASS  face expected volume
+PASS  intersect face_i a touch
+PASS  face_i validated mesh
+PASS  face_i expected volume
+PASS  translate touch 0 2 0
+PASS  union edge a touch
+PASS  edge contact rejected
+PASS  undo
+PASS  redo
+PASS  redo restores edge expression
+PASS  undo
+PASS  bad edit rejected
+PASS  redo
+PASS  failed edit preserves redo
+PASS  undo
+PASS  box branch 1 1 1
+PASS  new edit truncates redo
+PASS  setbox d L 4 2 2
+PASS  d validated mesh
+PASS  d expected volume
+PASS  a validated mesh
+PASS  a expected volume
+PASS  undo
+PASS  d validated mesh
+PASS  d expected volume
+PASS  redo
+PASS  d validated mesh
+PASS  d expected volume
+PASS  invalid subtree edit rejected
+PASS  d validated mesh
+PASS  d expected volume
+PASS  fixed exact quarter turn
+PASS  fixed overflow leaves input unchanged
+PASS  fixed exact translation
+PASS  fixed positive tie-even
+PASS  fixed positive odd tie
+PASS  fixed negative tie-even
+PASS  fixed negative odd tie
+PASS  fixed decimal parsed without binary float
+PASS  fixed decimal range rejected
+PASS  fixed exact plane classification
+PASS  fixed representable split
+PASS  fixed unsafe off-grid split rejected
+PASS  box full geometric validation
+PASS  collapsed triangle rejected
+PASS  inward shell rejected
+PASS  overlapping shells pass edge closure
+PASS  overlapping shells rejected geometrically
+PASS  production quantum is exactly 2^-48
+PASS  production parses one exact tick
+PASS  production tick formatting exact
+PASS  production half tick rounds to even zero
+PASS  production odd half tick rounds up
+PASS  production negative tie rounds even
+PASS  production rejects exact out-of-domain input
+PASS  production rejects unsupported exponent grammar
+PASS  2000 exact production decimal round trips
+PASS  production endpoint round trip
+PASS  production endpoint round trip
+PASS  production endpoint round trip
+PASS  production translation rejects overflow atomically
+PASS  four production quarter turns restore point
+PASS  four production quarter turns restore point
+PASS  four production quarter turns restore point
+PASS  production scale tie-even
+PASS  production scale tie-even
+PASS  production scaling overflow leaves value unchanged
+PASS  production cardinal trigonometry exact
+PASS  production noncardinal sine
+PASS  production square root
+PASS  production larger square root
+PASS  production tiny square root
+PASS  production atan quadrants
+PASS  production cube with cylindrical cut evaluates
+PASS  production out-of-range transform fails evaluation
+PASS  failed fixed evaluation exposes no mesh
+PASS  out-of-range symbolic bounds fail without exception
+
+all tests passed
+Note: Building forge_cli=0.1.0-dev/cli.gpr...
+Compile
+   [Ada]          forge-transform.adb
+   [Ada]          forge-commands.adb
+   [Ada]          forge-model.adb
+   [Ada]          forge-grid.adb
+   [Ada]          forge-numeric.ads
+   [Ada]          forge-stl.adb
+   [Ada]          forge-session.adb
+   [Ada]          forge-primitives.adb
+   [Ada]          forge-csg.adb
+   [Ada]          forge-mesh.adb
+   [Ada]          forge-history.adb
+   [Ada]          forge-text.adb
+   [Ada]          forge.adb
+   [Ada]          forge-fixed.adb
+   [Ada]          forge-validation.adb
+   [Ada]          forge-fixed_geometry.adb
+   [Ada]          forge-obj.adb
+   [Ada]          forge-model_bounds.adb
+Build Libraries
+   [gprlib]       forge.lexch
+   [archive]      libforge.a
+   [index]        libforge.a
+Bind
+   [gprbind]      forge_cli.bexch
+   [Ada]          forge_cli.ali
+Link
+   [link]         forge_cli.adb
+Success: Build finished successfully in 1.43 seconds.
+PASS  CLI status matches expected errors: ['err line 2: err document contains non-modeling command']
+PASS  one response per command
+PASS  document cannot execute export side effects
+PASS  failed load preserves original model
+PASS  undo/redo and save/load preserve OBJ bytes
+PASS  recognized OBJ metadata
+PASS  recognized OBJ metadata
+PASS  OBJ has vertices and faces
+PASS  OBJ coordinates finite
+PASS  OBJ closed with opposite oriented twins
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+PASS  recognized OBJ metadata
+PASS  recognized OBJ metadata
+PASS  OBJ has vertices and faces
+PASS  OBJ coordinates finite
+PASS  OBJ closed with opposite oriented twins
+PASS  bracket volume matches polygonal hole
+PASS  bracket OBJ bounds correct
+Bracket: 761 vertices, 1522 triangles, volume 1378667238593066326277977838349261/39614081257132168796771975168
+PASS  CLI status matches expected errors: ['err empty result has no OBJ solid', 'err export requires an .obj file', 'err bad arguments for box', 'err bad arguments for save', 'err bad arguments for load', 'err bad arguments for box', 'err transform outside supported numeric domain']
+PASS  one response per command
+PASS  failed empty export preserves existing destination
+PASS  export rejects non-OBJ format
+PASS  parse failures leave model usable
+PASS  CLI status matches expected errors: ['err capacity exceeded: named objects']
+PASS  one response per command
+PASS  named-object capacity failure preserves prior objects
+PASS  CLI status matches expected errors: ['err expression depth, cycle or arity invalid']
+PASS  one response per command
+PASS  CLI status matches expected errors: ['err line 1: err unsupported document version or numeric profile']
+PASS  one response per command
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+PASS  recognized OBJ metadata
+PASS  recognized OBJ metadata
+PASS  OBJ has vertices and faces
+PASS  OBJ coordinates finite
+PASS  OBJ closed with opposite oriented twins
+PASS  parametric box difference volume
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+PASS  recognized OBJ metadata
+PASS  recognized OBJ metadata
+PASS  OBJ has vertices and faces
+PASS  OBJ coordinates finite
+PASS  OBJ closed with opposite oriented twins
+PASS  parametric box difference volume
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+PASS  recognized OBJ metadata
+PASS  recognized OBJ metadata
+PASS  OBJ has vertices and faces
+PASS  OBJ coordinates finite
+PASS  OBJ closed with opposite oriented twins
+PASS  parametric box difference volume
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+PASS  symbolic transformed bounds available
+PASS  conservative subtraction bounds distinguished from empty evaluated result
+PASS  CLI status matches expected errors: []
+PASS  one response per command
+1811 integration assertions passed
+PASS  no floating type/library in forge-commands.adb
+PASS  no floating type/library in forge-commands.ads
+PASS  no floating type/library in forge-csg.adb
+PASS  no floating type/library in forge-csg.ads
+PASS  no floating type/library in forge-fixed.adb
+PASS  no floating type/library in forge-fixed.ads
+PASS  no floating type/library in forge-fixed_geometry.adb
+PASS  no floating type/library in forge-fixed_geometry.ads
+PASS  no floating type/library in forge-grid.adb
+PASS  no floating type/library in forge-grid.ads
+PASS  no floating type/library in forge-history.adb
+PASS  no floating type/library in forge-history.ads
+PASS  no floating type/library in forge-mesh.adb
+PASS  no floating type/library in forge-mesh.ads
+PASS  no floating type/library in forge-model.adb
+PASS  no floating type/library in forge-model.ads
+PASS  no floating type/library in forge-model_bounds.adb
+PASS  no floating type/library in forge-model_bounds.ads
+PASS  no floating type/library in forge-numeric.ads
+PASS  no floating type/library in forge-obj.adb
+PASS  no floating type/library in forge-obj.ads
+PASS  no floating type/library in forge-primitives.adb
+PASS  no floating type/library in forge-primitives.ads
+PASS  no floating type/library in forge-session.adb
+PASS  no floating type/library in forge-session.ads
+PASS  no floating type/library in forge-stl.adb
+PASS  no floating type/library in forge-stl.ads
+PASS  no floating type/library in forge-text.adb
+PASS  no floating type/library in forge-text.ads
+PASS  no floating type/library in forge-transform.adb
+PASS  no floating type/library in forge-transform.ads
+PASS  no floating type/library in forge-validation.adb
+PASS  no floating type/library in forge-validation.ads
+PASS  no floating type/library in forge.adb
+PASS  no floating type/library in forge.ads
+PASS  compiled Forge objects exist for instruction audit
+PASS  integer-only numeric instructions in forge-commands.o
+PASS  integer-only numeric instructions in forge-csg.o
+PASS  integer-only numeric instructions in forge-fixed.o
+PASS  integer-only numeric instructions in forge-fixed_geometry.o
+PASS  integer-only numeric instructions in forge-grid.o
+PASS  integer-only numeric instructions in forge-history.o
+PASS  integer-only numeric instructions in forge-mesh.o
+PASS  integer-only numeric instructions in forge-model.o
+PASS  integer-only numeric instructions in forge-model_bounds.o
+PASS  integer-only numeric instructions in forge-numeric.o
+PASS  integer-only numeric instructions in forge-obj.o
+PASS  integer-only numeric instructions in forge-primitives.o
+PASS  integer-only numeric instructions in forge-session.o
+PASS  integer-only numeric instructions in forge-stl.o
+PASS  integer-only numeric instructions in forge-text.o
+PASS  integer-only numeric instructions in forge-transform.o
+PASS  integer-only numeric instructions in forge-validation.o
+PASS  integer-only numeric instructions in forge.o
+PASS  fixed CLI command outcomes: 9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/model.forge
+ok loaded 2 commands
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  every exported coordinate is an exact production grid point
+PASS  one-tick translation survives export exactly
+PASS  fixed save/load reproduces OBJ bytes
+PASS  saved document declares fixed48 profile
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  end-to-end ties-to-even input: 0.0000000000000017763568394002504646778106689453125
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  end-to-end ties-to-even input: 0.0000000000000053290705182007513940334320068359375
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  end-to-end ties-to-even input: -0.0000000000000017763568394002504646778106689453125
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  end-to-end ties-to-even input: -0.0000000000000053290705182007513940334320068359375
+PASS  fixed CLI command outcomes:  updated; mesh not evaluated
+err line 1: err unsupported document version or numeric profile
+ok a profile fixed48 vertices 8 triangles 12 solid yes volume 8 min -1 -1 -1 max 1 1 1
+
+PASS  incompatible profile preserves fixed model
+PASS  fixed CLI command outcomes:  updated; mesh not evaluated
+err line 1: err unsupported document version or numeric profile
+ok a profile fixed48 vertices 8 triangles 12 solid yes volume 8 min -1 -1 -1 max 1 1 1
+
+PASS  incompatible profile preserves fixed model
+PASS  fixed CLI command outcomes:  updated; mesh not evaluated
+err line 1: err unsupported document version or numeric profile
+ok a profile fixed48 vertices 8 triangles 12 solid yes volume 8 min -1 -1 -1 max 1 1 1
+
+PASS  incompatible profile preserves fixed model
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  fixed rotation matches rational series reference: 31
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  fixed rotation matches rational series reference: -31
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  fixed rotation matches rational series reference: 135
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  fixed rotation matches rational series reference: 359.5
+PASS  fixed CLI command outcomes: ok model updated; mesh not evaluated
+ok model updated; mesh not evaluated
+ok wrote OBJ /var/folders/_x/prg9h8ss6xz4y1j96tkt33j40000gn/T/forge-fixed-wyecplaw/restored.obj
+
+PASS  fixed rotation matches rational series reference: -720.5
+PASS  fixed CLI command outcomes: ; mesh not evaluated
+ok solid
+ok cut profile fixed48 vertices 761 triangles 1522 solid yes volume 34802.45394672252684387103727203793823719024658203125 min -30 -4 -20 max 30 54 20
+
+PASS  fixed bracket Boolean qualification at 24 segments
+PASS  fixed CLI command outcomes: mesh not evaluated
+ok solid
+ok cut profile fixed48 vertices 1637 triangles 3274 solid yes volume 34798.521793210117660777314085862599313259124755859375 min -30 -4 -20 max 30 54 20
+
+PASS  fixed bracket Boolean qualification at 64 segments
+PASS  fixed CLI command outcomes: mesh not evaluated
+ok solid
+ok cut profile fixed48 vertices 3081 triangles 6162 solid yes volume 34798.037611909789493580547059536911547183990478515625 min -30 -4 -20 max 30 54 20
+
+PASS  fixed bracket Boolean qualification at 128 segments
+PASS  fixed CLI command outcomes: ; mesh not evaluated
+ok solid
+ok cut profile fixed48 vertices 5965 triangles 11930 solid yes volume 34797.916511880603394502031733281910419464111328125 min -30 -4 -20 max 30 54 20
+
+PASS  fixed bracket Boolean qualification at 256 segments
+91 fixed-point acceptance checks passed
+Phase 1 of 3: generation of data representation information ...
+Phase 2 of 3: generation of Global contracts ...
+Phase 3 of 3: analysis of data and information flow ...
+ warning: unused initial value of "I"
+--> bedrock-buffers.ads:39:20
+   39 |       procedure Fill (I : in out Image; C : Color);
+      |                       ^
+ info: no contextual analysis of "Less" (in potentially unevaluated context)
+--> forge-mesh.adb:101:38
+
+ info: analyzing call to "Less" in context
+--> forge-mesh.adb:104:27
+
+ info: analyzing call to "Sift" in context
+--> forge-mesh.adb:121:10
+
+ info: analyzing call to "Sift" in context
+--> forge-mesh.adb:129:10
+
+ info: no contextual analysis of "Less" (in potentially unevaluated context)
+--> forge-mesh.adb:142:43
+Success: all checks proved (99 checks).
+Summary logged in /Users/harrisonbrown/Documents/Software/forge/obj/gnatprove/gnatprove.out
+Phase 1 of 3: generation of data representation information ...
+Phase 2 of 3: generation of Global contracts ...
+Phase 3 of 3: flow analysis and proof ...
+ info: cannot unroll loop (too many loop iterations) [info-unrolling-inlining]
+--> forge-model.adb:91:21
+Success: all checks proved (189 checks).
+Summary logged in /Users/harrisonbrown/Documents/Software/forge/obj/gnatprove/gnatprove.out

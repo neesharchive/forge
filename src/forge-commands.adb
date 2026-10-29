@@ -1,8 +1,6 @@
-with Ada.Text_IO;
-with Ada.Strings.Fixed;
+with Forge.Text;
 package body Forge.Commands with SPARK_Mode => Off is
-   --  Off: 'Value and 'Image on floats are not in SPARK. The grammar is
-   --  small enough that a hand-written SPARK tokenizer is a fair task.
+   --  Tokenization and decimal text boundaries are tested outside SPARK.
 
    Max_Tokens : constant := 10;
    type Token_Bounds is record
@@ -108,7 +106,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       procedure Get_Num (Tok_I, Into : Positive) is
       begin
          if G then
-            Nums (Into) := Scalar'Value (Tok (Tok_I));
+            Forge.Text.Parse (Tok (Tok_I), Nums (Into), G);
          end if;
       exception
          when Constraint_Error => G := False;
@@ -371,22 +369,7 @@ package body Forge.Commands with SPARK_Mode => Off is
    -- Image --
    -----------
 
-   function Img (S : Scalar) return String is
-      --  Readable when possible, exact always: an integral value prints
-      --  as an integer, anything else as Scalar'Image (17 significant
-      --  digits, round-trips through 'Value). Humans and agents both
-      --  read these files.
-      package Scalar_IO is new Ada.Text_IO.Float_IO (Scalar);
-      Buffer : String (1 .. 64);
-      function Strip (R : String) return String is
-        (if R (R'First) = ' ' then R (R'First + 1 .. R'Last) else R);
-   begin
-      if abs S < 1.0e15 and then S = Scalar'Floor (S) then
-         return Strip (Long_Long_Integer'Image (Long_Long_Integer (S)));
-      end if;
-      Scalar_IO.Put (Buffer, S, Aft => Scalar'Digits + 2, Exp => 4);
-      return Ada.Strings.Fixed.Trim (Buffer, Ada.Strings.Both);
-   end Img;
+   function Img (S : Scalar) return String is (Forge.Text.Number (S));
 
    function Image (C : Command) return String is
       function Quoted (P : Path_String) return String;

@@ -14,6 +14,7 @@ fi
 (cd tests && "$ALR_EXECUTABLE" -n build && ./bin/tests)
 (cd cli && "$ALR_EXECUTABLE" -n build)
 python3 tests/integration.py
+python3 tests/fixed_point.py
 "$ALR_EXECUTABLE" -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
-"$ALR_EXECUTABLE" -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 \
-  --checks-as-errors=on -u forge-fixed.adb forge-model.adb forge-numeric.ads forge-history.adb
+"$ALR_EXECUTABLE" -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 -f \
+  --checks-as-errors=on -u forge-fixed.adb forge-grid.adb forge-model.adb forge-numeric.ads forge-history.adb

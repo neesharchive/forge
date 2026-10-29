@@ -1,12 +1,4 @@
-with Ada.Numerics;
-with Ada.Numerics.Generic_Elementary_Functions;
-
 package body Forge.Primitives with SPARK_Mode => Off is
-   --  Off only for the elementary functions (sin/cos) used by Cylinder.
-   --  Box is plain arithmetic and can be split into a SPARK child.
-
-   package Elem is new Ada.Numerics.Generic_Elementary_Functions (Scalar);
-
    procedure Box (M : in out Tri_Mesh; W, H, D : Scalar; Ok : out Boolean) is
       X : constant Scalar := W / 2.0;
       Y : constant Scalar := H / 2.0;
@@ -49,7 +41,6 @@ package body Forge.Primitives with SPARK_Mode => Off is
       Half : constant Scalar := H / 2.0;
       Bot, Top : array (1 .. Max_Segments) of Vertex_Index;
       CB, CT   : Vertex_Index;  --  cap centres
-      Two_Pi   : constant Scalar := 2.0 * Ada.Numerics.Pi;
       procedure Tri (A, B, C : Vertex_Index);
       procedure Tri (A, B, C : Vertex_Index) is
       begin
@@ -69,10 +60,10 @@ package body Forge.Primitives with SPARK_Mode => Off is
       end if;
       for I in 1 .. Segments loop
          declare
-            A : constant Scalar := Two_Pi * Scalar (I - 1) / Scalar (Segments);
-            X : constant Scalar := R * Elem.Cos (A);
-            Y : constant Scalar := R * Elem.Sin (A);
+            S, C, X, Y : Scalar;
          begin
+            Sin_Cos (Scalar'(360.0 * Scalar (I - 1)) / Scalar (Segments), S, C);
+            X := R * C; Y := R * S;
             Add_Vertex (M, (X, Y, -Half), Bot (I), Ok);
             if not Ok then
                Clear (M);

@@ -1,14 +1,6 @@
-with Ada.Text_IO;
-with Ada.Strings.Fixed;
+with Forge.Text;
 package body Forge.OBJ is
-   function Number (V : Scalar) return String;
-   function Number (V : Scalar) return String is
-      package IO is new Ada.Text_IO.Float_IO (Scalar);
-      Buffer : String (1 .. 48);
-   begin
-      IO.Put (Buffer, V, Aft => Scalar'Digits + 2, Exp => 4);
-      return Ada.Strings.Fixed.Trim (Buffer, Ada.Strings.Both);
-   end Number;
+   function Number (V : Scalar) return String renames Forge.Text.Number;
 
    function Vertex_Line (P : Vec3) return String is
    begin

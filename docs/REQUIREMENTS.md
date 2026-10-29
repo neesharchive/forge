@@ -1,5 +1,11 @@
 # Forge requirements and implementation plan
 
+> Historical design draft. The production backend was subsequently converted to
+> fixed48 at the user's direction. `NUMERICS.md` and `VERIFICATION.md` describe
+> the implemented arithmetic and current proof scope; the floating-first policy
+> below and the prototype's 2^-16 grid are not the production configuration.
+
+
 Implementation specification — October 27, 2026; OBJ export revision
 
 ## 1. Purpose and status

@@ -1,4 +1,4 @@
-# forge-format 1 numeric floating
+# forge-format 1 numeric fixed48
 # Face-sharing L bracket with a tessellated through-hole.
 box base 60 8 40
 box wall 8 50 40

@@ -163,7 +163,7 @@ package body Forge.Mesh with SPARK_Mode is
       for I in 1 .. M.NT loop
          Sum := Sum + Dot (M.V (M.T (I).A), Cross (M.V (M.T (I).B), M.V (M.T (I).C)));
       end loop;
-      return Sum / 6.0;
+      return Sum / Scalar'(6.0);
    end Volume;
 
    procedure Bounds (M : Tri_Mesh; Lo, Hi : out Vec3) is

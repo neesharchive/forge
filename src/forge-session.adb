@@ -9,6 +9,7 @@ with Forge.Model_Bounds;
 with Forge.Primitives;
 with Forge.OBJ;
 with Forge.Transform;
+with Forge.Text;
 with Forge.Validation;
 
 package body Forge.Session is
@@ -18,7 +19,7 @@ package body Forge.Session is
    procedure Free_Scratch is new Ada.Unchecked_Deallocation (CSG.Workspace, Scratch_Access);
    procedure Set (R : out Response; Ok : Boolean; Msg : String) renames Responses.Set;
    procedure Append (R : in out Response; Msg : String) renames Responses.Append;
-   Header : constant String := "# forge-format 1 numeric floating";
+   Header : constant String := "# forge-format 1 numeric fixed48";
 
    procedure Dispose (D : in out State_Access);
 
@@ -486,7 +487,7 @@ package body Forge.Session is
          Set (R, False, "err temporary output already exists"); return;
       end if;
       Ada.Text_IO.Create (F, Ada.Text_IO.Out_File, Temp);
-      Ada.Text_IO.Put_Line (F, "# Forge Wavefront OBJ; units millimetres; profile floating");
+      Ada.Text_IO.Put_Line (F, "# Forge Wavefront OBJ; units millimetres; profile fixed48");
       Ada.Text_IO.Put_Line (F, "o " & Image (D.Solids (I).N));
       declare
          M : Tri_Mesh renames D.Solids (I).M.all;
@@ -661,8 +662,10 @@ package body Forge.Session is
                   elsif B.Empty then
                      Set (R, True, "ok conservative bounds empty");
                   else
-                     Set (R, True, "ok conservative min" & B.Lo.X'Image & B.Lo.Y'Image
-                          & B.Lo.Z'Image & " max" & B.Hi.X'Image & B.Hi.Y'Image & B.Hi.Z'Image);
+                     Set (R, True, "ok conservative min " & Text.Number (B.Lo.X)
+                          & " " & Text.Number (B.Lo.Y) & " " & Text.Number (B.Lo.Z)
+                          & " max " & Text.Number (B.Hi.X) & " " & Text.Number (B.Hi.Y)
+                          & " " & Text.Number (B.Hi.Z));
                   end if;
                end;
             elsif C.K = Params then
@@ -682,14 +685,15 @@ package body Forge.Session is
                      Lo, Hi : Vec3;
                   begin
                      Set (R, True, "ok " & Image (S.Data.Solids (I).N));
-                     Append (R, " profile floating vertices" & M.NV'Image
+                     Append (R, " profile fixed48 vertices" & M.NV'Image
                              & " triangles" & M.NT'Image
                              & (if M.NT = 0 then " empty yes" else " solid yes")
-                             & " volume" & Volume (M)'Image);
+                             & " volume " & Text.Number (Volume (M)));
                      if M.NT /= 0 then
                         Bounds (M, Lo, Hi);
-                        Append (R, " min" & Lo.X'Image & Lo.Y'Image & Lo.Z'Image
-                                & " max" & Hi.X'Image & Hi.Y'Image & Hi.Z'Image);
+                        Append (R, " min " & Text.Number (Lo.X) & " " & Text.Number (Lo.Y)
+                                & " " & Text.Number (Lo.Z) & " max " & Text.Number (Hi.X)
+                                & " " & Text.Number (Hi.Y) & " " & Text.Number (Hi.Z));
                      else
                         Append (R, " bounds none");
                      end if;

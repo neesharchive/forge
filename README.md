@@ -76,10 +76,24 @@ redo suffix or cached meshes.
 
 ## Geometry and numbers
 
-Production evaluation uses the existing `Long_Float` scalar and bounded BSP
-clipping. The declared coordinate domain is +/-10,000 mm, with an absolute
-1e-8 mm positional tolerance; supported parts must have well-separated features.
-This is approximate polygonal geometry, not an exact analytic CAD kernel.
+Production uses Ada fixed-point arithmetic from decimal input through geometry,
+validation, status reporting and exact decimal OBJ output. `Forge.Scalar` has
+48 fractional binary bits and 128-bit storage; coordinates remain bounded to
++/-10,000 mm. `Forge.Grid` supplies proved checked translation, exact quarter
+turns and ties-to-even scaling with widened integer products. No floating-point
+scalar, elementary-function library or formatter is used in the modeling path.
+
+Numbers are plain signed decimals with up to 64 fractional digits; exponent and
+Ada based-literal syntax are not accepted. Input is quantized once, nearest with
+ties to even. Saved documents declare `numeric fixed48`; incompatible numeric
+profiles are rejected. Existing floating-profile documents need explicit conversion
+before replay. Headerless command scripts use the current fixed48 profile.
+
+BSP remains approximate polygonal geometry, with positional tolerance 2^-27 mm.
+Intersections, general rotations and curved tessellation are quantized fixed-point
+constructions. Fixed point does not make these operations analytically exact.
+Unsupported or collapsed geometry fails validation and never exposes a stale mesh.
+See [numeric policy](docs/NUMERICS.md) for rounding and proof limits.
 
 Validation checks finite/ranged coordinates, nondegenerate faces, oriented edge
 pairing, vertex fans, triangle intersections and shell nesting/orientation.
@@ -88,12 +102,8 @@ scratch permits 16,384 polygons, 8,192 splitter nodes and 256 corners per polygo
 Model trees permit 4,096 allocated nodes and depth 128; there are 64 named objects
 and 4,096 history commands. Capacity or precision failures do not become solids.
 
-`Forge.Fixed` and `Forge.Fixed_Geometry` are a separate fixed-grid feasibility
-implementation: 2^-16 mm ticks, exact quarter turns, checked translation,
-ties-to-even integer rounding, decimal parsing without a binary-float intermediate,
-128-bit determinant classification and checked grid edge construction. An off-grid
-intersection that cannot remain on its plane is rejected. This prototype is not a
-second production BSP backend. See [numeric decision](docs/NUMERICS.md).
+`Forge.Fixed` and `Forge.Fixed_Geometry` retain the earlier, separate 2^-16 mm
+feasibility experiments. The production grid is `Forge.Grid`, at 2^-48 mm.
 
 ## SPARK verification
 
@@ -107,18 +117,19 @@ with newer SDK library stubs, even if the host exports a newer SDKROOT. Set
 ```sh
 alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
 alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 \
-  --checks-as-errors=on -u forge-fixed.adb forge-model.adb forge-numeric.ads forge-history.adb
+  --checks-as-errors=on -u forge-fixed.adb forge-grid.adb forge-model.adb forge-numeric.ads forge-history.adb
 ```
 
 GNATprove is included as a verification-tool dependency. On Apple Silicon the
 provided proof engine also needs GMP (`brew install gmp`). Flow and contract proof
-are separate gates. The BSP evaluator, geometric validator, fixed-geometry
-prototype, parser/session and OBJ encoder are tested Ada outside SPARK; the
-entire floating-point Boolean algorithm is **not** formally proved. See
+are separate gates. The BSP evaluator, geometric validator, elementary functions, fixed-geometry
+prototype, parser/session and OBJ encoder are tested Ada outside SPARK; whole
+Boolean correctness is **not** formally proved. See
 [verification scope](docs/VERIFICATION.md) for evidence and limits.
 
-The old `Forge.STL` serializer remains as an independent compatibility package;
-the session export command and examples use OBJ.
+The legacy `Forge.STL` compatibility package encodes its required binary32 file
+fields using integer arithmetic. Its file format is lossy; the session export
+command and examples use exact decimal OBJ.
 
 ## Further documentation
 

@@ -10,6 +10,8 @@ with Forge.Session;    use Forge.Session;
 with Forge.STL;
 with Forge.Transform;
 with Forge.Fixed;
+with Forge.Grid;
+with Forge.Text;
 with Forge.Fixed_Geometry;
 with Forge.Validation;
 with Interfaces;
@@ -27,6 +29,7 @@ procedure Tests is
    procedure Test_Booleans;
    procedure Test_Fixed;
    procedure Test_Validation;
+   procedure Test_Production_Fixed;
 
    procedure Check (Name : String; Cond : Boolean) is
    begin
@@ -36,7 +39,9 @@ procedure Tests is
       end if;
    end Check;
 
-   function Near (A, B : Scalar; Tol : Scalar := 1.0e-9) return Boolean is
+   function Ratio (N, D : Integer) return Scalar is (Scalar (N) / Scalar (D));
+
+   function Near (A, B : Scalar; Tol : Scalar := 16#0.00000004#) return Boolean is
      (abs (A - B) <= Tol * Scalar'Max (1.0, abs B));
 
    ---------------------------------------------------------------------
@@ -61,7 +66,7 @@ procedure Tests is
       Add_Triangle (M, V2, V3, V4, Ok);   --  slanted
       Check ("tetra well formed", Well_Formed (M));
       Check ("tetra watertight", Is_Watertight (M));
-      Check ("tetra volume 1/6", Near (Volume (M), 1.0 / 6.0));
+      Check ("tetra volume 1/6", Near (Volume (M), Ratio (1, 6)));
 
       --  Break it: one triangle flipped.
       M.T (4) := (V3, V2, V4);
@@ -89,17 +94,21 @@ procedure Tests is
       Check ("cylinder ok", Ok);
       Check ("cylinder is solid", Is_Solid (M));
       Check ("cylinder counts", M.NV = 130 and M.NT = 256);
-      Check ("cylinder volume approx pi*2", Near (Volume (M), 6.2832, 2.0e-3));
+      Check ("cylinder volume approx pi*2", Near (Volume (M), Ratio (62_832, 10_000),
+            Ratio (2, 1_000)));
 
       Transform.Translate (M, (5.0, 0.0, 0.0));
-      Check ("translate keeps volume", Near (Volume (M), 6.2832, 2.0e-3) and Is_Solid (M));
+      Check ("translate keeps volume", Near (Volume (M), Ratio (62_832, 10_000),
+            Ratio (2, 1_000)) and Is_Solid (M));
       Transform.Rotate (M, X, 90.0);
       Check ("rotate keeps solid", Is_Solid (M));
       Transform.Scale (M, 2.0);
-      Check ("scale x2 gives x8 volume", Near (Volume (M), 8.0 * 6.2832, 2.0e-3));
+      Check ("scale x2 gives x8 volume", Near (Volume (M), 8.0 * Ratio (62_832, 10_000),
+            Ratio (2, 1_000)));
    end Test_Primitives;
 
    procedure Test_STL is
+      use type STL.Byte;
       M   : Tri_Mesh (16, 32);
       Ok  : Boolean;
       Buf : STL.Byte_Array (1 .. 1000);
@@ -110,6 +119,10 @@ procedure Tests is
       STL.Write (M, Buf, Last);
       Check ("stl wrote exactly Size", Last = 684);
       Check ("stl count field = 12", Natural (Buf (81)) = 12 and Natural (Buf (82)) = 0);
+      Check ("integer STL encoding of negative unit normal",
+             Buf (93) = 0 and Buf (94) = 0 and Buf (95) = 128 and Buf (96) = 191);
+      Check ("integer STL encoding of negative half coordinate",
+             Buf (97) = 0 and Buf (98) = 0 and Buf (99) = 0 and Buf (100) = 191);
    end Test_STL;
 
    procedure Test_Commands is
@@ -283,6 +296,96 @@ procedure Tests is
       Check ("fixed unsafe off-grid split rejected", not Good);
    end Test_Fixed;
 
+   procedure Test_Production_Fixed is
+      use type Grid.Tick;
+      use type Grid.Point;
+      use type Interfaces.Unsigned_64;
+      V : Scalar;
+      Good, All_Good : Boolean;
+      T, Saved : Grid.Tick;
+      P : Grid.Point := (Grid.Tick'Last, 1, -1);
+      Edges : constant array (1 .. 3) of Grid.Tick := [Grid.Tick'First, 0, Grid.Tick'Last];
+      State : Interfaces.Unsigned_64 := 17;
+      S, C : Scalar;
+      Session : Forge.Session.Session;
+      R : Response;
+   begin
+      Check ("production quantum is exactly 2^-48", Scalar'Small = Quantum);
+      Text.Parse ("0.000000000000003552713678800500929355621337890625", V, Good);
+      Check ("production parses one exact tick", Good and then V = Quantum);
+      Check ("production tick formatting exact",
+             Text.Number (Quantum) = "0.000000000000003552713678800500929355621337890625");
+      Text.Parse ("0.0000000000000017763568394002504646778106689453125", V, Good);
+      Check ("production half tick rounds to even zero", Good and then V = 0.0);
+      Text.Parse ("0.0000000000000053290705182007513940334320068359375", V, Good);
+      Check ("production odd half tick rounds up", Good and then V = 2 * Quantum);
+      Text.Parse ("-0.0000000000000053290705182007513940334320068359375", V, Good);
+      Check ("production negative tie rounds even", Good and then V = -2 * Quantum);
+      Text.Parse ("10000.000000000000000000000000000000000000000000000001", V, Good);
+      Check ("production rejects exact out-of-domain input", not Good);
+      Text.Parse ("1e2", V, Good);
+      Check ("production rejects unsupported exponent grammar", not Good);
+      All_Good := True;
+      for I in 1 .. 2_000 loop
+         State := State * 6_364_136_223_846_793_005 + 1;
+         T := Grid.Tick (State mod Interfaces.Unsigned_64 (Grid.Limit));
+         if I mod 2 = 0 then
+            T := -T;
+         end if;
+         Text.Parse (Text.Number (Grid.To_Scalar (T)), V, Good);
+         All_Good := All_Good and then Good and then Grid.To_Tick (V) = T;
+      end loop;
+      Check ("2000 exact production decimal round trips", All_Good);
+      for Edge of Edges loop
+         Text.Parse (Text.Number (Grid.To_Scalar (Edge)), V, Good);
+         Check ("production endpoint round trip", Good and then Grid.To_Tick (V) = Edge);
+      end loop;
+      Grid.Translate (P, (1, 0, 0), Good);
+      Check ("production translation rejects overflow atomically",
+             not Good and then P = (Grid.Tick'Last, 1, -1));
+      for A in Axis loop
+         declare
+            Rotated : Grid.Point := P;
+         begin
+            for I in 1 .. 4 loop
+               Rotated := Grid.Quarter_Turn (Rotated, A);
+            end loop;
+            Check ("four production quarter turns restore point", Rotated = P);
+         end;
+      end loop;
+      for Sign in -1 .. 1 loop
+         if Sign /= 0 then
+            T := Grid.Tick (3 * Sign);
+            Grid.Scale (T, Grid.Unit / 2, Good);
+            Check ("production scale tie-even", Good and then T = Grid.Tick (2 * Sign));
+         end if;
+      end loop;
+      T := Grid.Tick'Last; Saved := T;
+      Grid.Scale (T, 2 * Grid.Unit, Good);
+      Check ("production scaling overflow leaves value unchanged", not Good and then T = Saved);
+      Sin_Cos (-270.0, S, C);
+      Check ("production cardinal trigonometry exact", S = 1.0 and then C = 0.0);
+      Sin_Cos (30.0, S, C);
+      Check ("production noncardinal sine", abs (S - 0.5) < 64 * Quantum);
+      Check ("production square root", abs (Sqrt (2.0) * Sqrt (2.0) - 2.0) < 8 * Quantum);
+      Check ("production larger square root", abs (Sqrt (100_000_000.0) - 10_000.0) < 8 * Quantum);
+      Check ("production tiny square root", Sqrt (Quantum) = Scalar (1) / 16_777_216);
+      Check ("production atan quadrants", Atan2 (1.0, 1.0) > 0.0
+             and then Atan2 (-1.0, -1.0) < -2.0);
+      Execute (Session, "box b 20 20 20", R);
+      Execute (Session, "cylinder cutter 6 30 32", R);
+      Execute (Session, "difference cut b cutter", R);
+      Execute (Session, "evaluate cut", R);
+      Check ("production cube with cylindrical cut evaluates", R.Ok);
+      Execute (Session, "box far 2 2 2", R);
+      Execute (Session, "translate far 10000 0 0", R);
+      Execute (Session, "evaluate far", R);
+      Check ("production out-of-range transform fails evaluation", not R.Ok);
+      Check ("failed fixed evaluation exposes no mesh", Mesh_Of (Session, To_Name ("far")) = null);
+      Execute (Session, "bounds far", R);
+      Check ("out-of-range symbolic bounds fail without exception", not R.Ok);
+   end Test_Production_Fixed;
+
    procedure Test_Validation is
       use Forge.Validation;
       M : Tri_Mesh (32, 64);
@@ -327,6 +430,7 @@ begin
    Test_Booleans;
    Test_Fixed;
    Test_Validation;
+   Test_Production_Fixed;
    New_Line;
    if Failures = 0 then
       Put_Line ("all tests passed");

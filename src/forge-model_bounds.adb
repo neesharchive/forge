@@ -79,5 +79,8 @@ package body Forge.Model_Bounds with SPARK_Mode => Off is
          when others => return;
       end case;
       Ok := B.Empty or else (Numeric.Valid (B.Lo) and then Numeric.Valid (B.Hi));
+   exception
+      when Constraint_Error =>
+         B := (others => <>); Ok := False;
    end Evaluate;
 end Forge.Model_Bounds;

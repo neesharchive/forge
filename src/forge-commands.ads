@@ -4,7 +4,7 @@
 --  you click, an agent emits lines when it reasons. Parse and Image
 --  are inverses; Commands_Round_Trip in tests/ checks it.
 --
---  Grammar (tokens separated by spaces, numbers as Ada reals or ints,
+--  Grammar (tokens separated by spaces, plain signed decimal numbers,
 --  names are identifiers up to Max_Name):
 --
 --    box        NAME W H D
@@ -119,6 +119,6 @@ package Forge.Commands with SPARK_Mode is
    function Image (C : Command) return String
      with Post => Image'Result'Length <= Max_Line;
    --  The canonical line. Parse (Image (C)) yields C for every modeling
-   --  command. Numbers are printed with enough digits to round-trip.
+   --  command. Numbers are printed as exact fixed-point decimals.
 
 end Forge.Commands;

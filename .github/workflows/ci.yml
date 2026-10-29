@@ -29,13 +29,15 @@ jobs:
         working-directory: cli
         run: alr -n build
       - name: Independent OBJ and document acceptance
-        run: python3 tests/integration.py
+        run: |
+          python3 tests/integration.py
+          python3 tests/fixed_point.py
       - name: Full SPARK flow analysis
         run: alr -n exec -- gnatprove -P forge.gpr --mode=flow --checks-as-errors=on
       - name: SPARK arithmetic, model and history proofs
         run: >-
-          alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2
-          --checks-as-errors=on -u forge-fixed.adb forge-model.adb forge-numeric.ads forge-history.adb
+          alr -n exec -- gnatprove -P forge.gpr --mode=prove --level=2 -f
+          --checks-as-errors=on -u forge-fixed.adb forge-grid.adb forge-model.adb forge-numeric.ads forge-history.adb
       - name: Retain proof evidence
         if: always()
         uses: actions/upload-artifact@v4

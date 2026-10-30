@@ -1,11 +1,7 @@
-with Ada.Numerics;
-with Ada.Numerics.Generic_Elementary_Functions;
+with Forge.Numerics;
 
 package body Forge.Primitives with SPARK_Mode => Off is
-   --  Off only for the elementary functions (sin/cos) used by Cylinder.
-   --  Box is plain arithmetic and can be split into a SPARK child.
-
-   package Elem is new Ada.Numerics.Generic_Elementary_Functions (Scalar);
+   --  Geometry is quantized to the fixed-point grid.
 
    procedure Box (M : in out Tri_Mesh; W, H, D : Scalar; Ok : out Boolean) is
       X : constant Scalar := W / 2.0;
@@ -40,7 +36,15 @@ package body Forge.Primitives with SPARK_Mode => Off is
             return;
          end if;
       end loop;
-      Ok := True;
+      Ok := X > 0.0 and then Y > 0.0 and then Z > 0.0;
+      for I in 1 .. M.NT loop
+         if Normal (M, I) = Origin then
+            Ok := False;
+         end if;
+      end loop;
+      if not Ok then
+         Clear (M);
+      end if;
    end Box;
 
    procedure Cylinder
@@ -49,7 +53,7 @@ package body Forge.Primitives with SPARK_Mode => Off is
       Half : constant Scalar := H / 2.0;
       Bot, Top : array (1 .. Max_Segments) of Vertex_Index;
       CB, CT   : Vertex_Index;  --  cap centres
-      Two_Pi   : constant Scalar := 2.0 * Ada.Numerics.Pi;
+      Two_Pi   : constant Scalar := 2.0 * Numerics.Pi;
       procedure Tri (A, B, C : Vertex_Index);
       procedure Tri (A, B, C : Vertex_Index) is
       begin
@@ -69,9 +73,9 @@ package body Forge.Primitives with SPARK_Mode => Off is
       end if;
       for I in 1 .. Segments loop
          declare
-            A : constant Scalar := Two_Pi * Scalar (I - 1) / Scalar (Segments);
-            X : constant Scalar := R * Elem.Cos (A);
-            Y : constant Scalar := R * Elem.Sin (A);
+            A : constant Scalar := Scalar (Two_Pi * Scalar (I - 1)) / Segments;
+            X : constant Scalar := R * Numerics.Cos (A);
+            Y : constant Scalar := R * Numerics.Sin (A);
          begin
             Add_Vertex (M, (X, Y, -Half), Bot (I), Ok);
             if not Ok then
@@ -95,6 +99,13 @@ package body Forge.Primitives with SPARK_Mode => Off is
             Tri (Bot (I), Top (J), Top (I));
          end;
       end loop;
+      if Ok then
+         for I in 1 .. M.NT loop
+            if Normal (M, I) = Origin then
+               Ok := False;
+            end if;
+         end loop;
+      end if;
       if not Ok then
          Clear (M);
       end if;

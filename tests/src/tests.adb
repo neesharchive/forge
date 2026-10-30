@@ -1,3 +1,4 @@
+pragma Warnings (Off, "static fixed-point value is not a multiple of Small");
 --  Unit tests. Plain Ada, no framework, non-zero exit on failure.
 
 with Ada.Command_Line;
@@ -20,6 +21,7 @@ procedure Tests is
    procedure Test_STL;
    procedure Test_Commands;
    procedure Test_Session;
+   procedure Test_Fixed;
 
    procedure Check (Name : String; Cond : Boolean) is
    begin
@@ -33,6 +35,45 @@ procedure Tests is
      (abs (A - B) <= Tol * Scalar'Max (1.0, abs B));
 
    ---------------------------------------------------------------------
+
+   procedure Test_Fixed is
+      M : Tri_Mesh (16, 32);
+      Ok : Boolean;
+      Before : Vec3;
+      C, D : Command;
+      Err : Path_String;
+      S : Forge.Session.Session;
+      R : Response;
+   begin
+      Check ("fixed grid resolution", Scalar'Small = 2.0 ** (-32));
+      Check ("fixed square root", Near (Length ((3.0, 4.0, 0.0)), 5.0));
+      Primitives.Box (M, 10_000.0, 10_000.0, 10_000.0, Ok);
+      Check ("volume has range beyond coordinates", Ok and then Volume (M) = 1.0e12);
+      Parse ("translate a -0.00000000023283064365386962890625 0.1 0", C, Ok, Err);
+      Check ("parse one negative grid unit", Ok and then C.By.X = -Scalar'Small);
+      Parse (Image (C), D, Ok, Err);
+      Check ("fixed decimals round trip exactly", Ok and then C.By = D.By);
+      Primitives.Box (M, 2.0, 2.0, 2.0, Ok);
+      Before := M.V (1);
+      for I in 1 .. 4 loop
+         Forge.Transform.Rotate (M, Z, 90.0);
+      end loop;
+      Check ("four quarter turns are exact", M.V (1) = Before);
+      begin
+         Forge.Transform.Translate (M, (10_000.0, 0.0, 0.0));
+         Check ("out of range transform rejected", False);
+      exception
+         when Constraint_Error =>
+            Check ("failed transform leaves vertices unchanged", M.V (1) = Before);
+      end;
+      Primitives.Box (M, Scalar'Small, 2.0, 2.0, Ok);
+      Check ("collapsed box rejected", not Ok and then M.NT = 0);
+      Execute (S, "box a 2 2 2", R);
+      Execute (S, "translate a 10000 0 0", R);
+      Check ("failed numeric edit is not recorded", not R.Ok and History_Length (S) = 1);
+      Execute (S, "info a", R);
+      Check ("session survives numeric failure", R.Ok);
+   end Test_Fixed;
 
    procedure Test_Mesh is
       M  : Tri_Mesh (16, 32);
@@ -173,6 +214,7 @@ procedure Tests is
    end Test_Session;
 
 begin
+   Test_Fixed;
    Test_Mesh;
    Test_Primitives;
    Test_STL;

@@ -1,5 +1,5 @@
 package body Forge.Commands with SPARK_Mode => Off is
-   --  Off: 'Value and 'Image on floats are not in SPARK. The grammar is
+   --  Off: text parsing and formatting are outside SPARK. The grammar is
    --  small enough that a hand-written SPARK tokenizer is a fair task.
 
    Max_Tokens : constant := 8;
@@ -89,6 +89,9 @@ package body Forge.Commands with SPARK_Mode => Off is
       begin
          if G then
             Nums (Into) := Scalar'Value (Tok (Tok_I));
+            if abs Nums (Into) > Coordinate_Limit then
+               G := False;
+            end if;
          end if;
       exception
          when Constraint_Error => G := False;
@@ -258,17 +261,30 @@ package body Forge.Commands with SPARK_Mode => Off is
    -----------
 
    function Img (S : Scalar) return String is
-      --  Readable when possible, exact always: an integral value prints
-      --  as an integer, anything else as Scalar'Image (17 significant
-      --  digits, round-trips through 'Value). Humans and agents both
-      --  read these files.
-      function Strip (R : String) return String is
-        (if R (R'First) = ' ' then R (R'First + 1 .. R'Last) else R);
+      type Wide_Integer is range -(2 ** 127) .. 2 ** 127 - 1;
+      Magnitude : constant Scalar := abs S;
+      Whole : constant Wide_Integer := Wide_Integer (Magnitude);
+      Integral : constant Wide_Integer :=
+        (if Scalar (Whole) > Magnitude then Whole - 1 else Whole);
+      Fraction : Scalar := Magnitude - Scalar (Integral);
+      Digits_Text : String (1 .. 32);
+      Last : Natural := 0;
+      Raw : constant String := Integral'Image;
    begin
-      if abs S < 1.0e15 and then S = Scalar'Floor (S) then
-         return Strip (Long_Long_Integer'Image (Long_Long_Integer (S)));
-      end if;
-      return Strip (Scalar'Image (S));
+      while Fraction /= 0.0 loop
+         Fraction := Fraction * 10;
+         declare
+            Rounded : constant Integer := Integer (Fraction);
+            Digit : constant Integer :=
+              (if Scalar (Rounded) > Fraction then Rounded - 1 else Rounded);
+         begin
+            Last := Last + 1;
+            Digits_Text (Last) := Character'Val (Character'Pos ('0') + Digit);
+            Fraction := Fraction - Scalar (Digit);
+         end;
+      end loop;
+      return (if S < 0.0 then "-" else "") & Raw (2 .. Raw'Last)
+        & (if Last = 0 then "" else "." & Digits_Text (1 .. Last));
    end Img;
 
    function Image (C : Command) return String is

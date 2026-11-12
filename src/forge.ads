@@ -4,18 +4,18 @@
 --  Forge.Session; the kernel computes, the session owns memory, the
 --  front ends (cli/, ui/) talk to the session in lines of text.
 
-with Bedrock.Generic_Vectors;
+with Forge_Vectors;
 with Bedrock.Names;
 
 package Forge with SPARK_Mode, Pure is
 
-   type Scalar is new Long_Float;
-   --  CAD needs range and 15 digits; fixed point is the wrong tool here.
-   --  What is proved is topology (integers), not floating-point geometry.
+   type Scalar is delta 2.0 ** (-32) range -(2.0 ** 80) .. 2.0 ** 80
+     with Small => 2.0 ** (-32), Size => 128;
+   --  Binary fixed point; the wider range accommodates products and volume.
+   Coordinate_Limit : constant Scalar := 10_000.0;
 
-   --  Vectors come from bedrock, the GAP foundation crate, instantiated
-   --  at forge's precision. Re-exported so `use Forge` is enough.
-   package Geometry is new Bedrock.Generic_Vectors (Scalar);
+   --  Fixed-point vector operations, re-exported so `use Forge` is enough.
+   package Geometry is new Forge_Vectors (Scalar);
 
    subtype Vec3 is Geometry.Vector3;
    Origin : Vec3 renames Geometry.Zero3;
@@ -27,8 +27,8 @@ package Forge with SPARK_Mode, Pure is
    function "*" (A : Vec3; S : Scalar) return Vec3 renames Geometry."*";
    function Dot (A, B : Vec3) return Scalar renames Geometry.Dot;
    function Cross (A, B : Vec3) return Vec3 renames Geometry.Cross;
-   function Length (A : Vec3) return Scalar renames Geometry.Length;
-   function Normalized (A : Vec3) return Vec3 renames Geometry.Normalized;
+   function Length (A : Vec3) return Scalar;
+   function Normalized (A : Vec3) return Vec3;
 
    subtype Axis is Geometry.Axis;
    function X return Axis renames Geometry.X;

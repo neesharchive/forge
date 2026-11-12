@@ -33,6 +33,8 @@ package body Forge.Mesh with SPARK_Mode is
 
    procedure Copy (From : Tri_Mesh; To : out Tri_Mesh; Ok : out Boolean) is
    begin
+      To.V := [others => Origin];
+      To.T := [others => (0, 0, 0)];
       To.NV := 0;
       To.NT := 0;
       if From.NV > To.Cap_V or else From.NT > To.Cap_T then
@@ -111,7 +113,7 @@ package body Forge.Mesh with SPARK_Mode is
       for I in 1 .. M.NT loop
          Sum := Sum + Dot (M.V (M.T (I).A), Cross (M.V (M.T (I).B), M.V (M.T (I).C)));
       end loop;
-      return Sum / 6.0;
+      return Sum / 6;
    end Volume;
 
    procedure Bounds (M : Tri_Mesh; Lo, Hi : out Vec3) is

@@ -237,6 +237,9 @@ package body Forge.Session is
          when others =>
             Set (R, False, "err not a modeling command");
       end case;
+   exception
+      when Constraint_Error =>
+         Set (R, False, "err outside fixed-point modeling range");
    end Apply;
 
    ---------------------------------------------------------------------

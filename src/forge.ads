@@ -4,7 +4,7 @@
 --  Forge.Session; the kernel computes, the session owns memory, the
 --  front ends (cli/, ui/) talk to the session in lines of text.
 
-with Forge_Vectors;
+with Bedrock.Generic_Fixed_Vectors;
 with Bedrock.Names;
 
 package Forge with SPARK_Mode, Pure is
@@ -14,8 +14,8 @@ package Forge with SPARK_Mode, Pure is
    --  Binary fixed point; the wider range accommodates products and volume.
    Coordinate_Limit : constant Scalar := 10_000.0;
 
-   --  Fixed-point vector operations, re-exported so `use Forge` is enough.
-   package Geometry is new Forge_Vectors (Scalar);
+   --  Bedrock fixed-point vectors, re-exported so `use Forge` is enough.
+   package Geometry is new Bedrock.Generic_Fixed_Vectors (Scalar);
 
    subtype Vec3 is Geometry.Vector3;
    Origin : Vec3 renames Geometry.Zero3;

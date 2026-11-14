@@ -14,11 +14,12 @@
 --    scale      NAME FACTOR
 --    union      NAME A B                      NAME := A + B
 --    difference NAME A B                      NAME := A - B
---    intersect  NAME A B
+--    intersect  NAME A B                      NAME may be A or B (in place)
 --    copy       NAME FROM
 --    delete     NAME
 --    list                                     query, not recorded
 --    info       NAME                          query, not recorded
+--    check      NAME                          query: is it a solid, and why not
 --    export     NAME FILE.stl                 side effect, not recorded
 --    undo                                     meta
 --    save       FILE.forge                    meta
@@ -34,7 +35,7 @@ package Forge.Commands with SPARK_Mode is
    type Kind is
      (Box, Cylinder, Translate, Rotate, Scale,
       Union, Difference, Intersect, Copy, Delete,
-      List, Info, Export, Undo, Save, Load,
+      List, Info, Check, Export, Undo, Save, Load,
       Comment, Empty);
 
    subtype Modeling is Kind range Box .. Delete;
@@ -74,7 +75,7 @@ package Forge.Commands with SPARK_Mode is
          when Copy =>
             Cp_Name  : Name;
             From     : Name;
-         when Delete | Info =>
+         when Delete | Info | Check =>
             Target   : Name;
          when Export =>
             Ex_Name  : Name;

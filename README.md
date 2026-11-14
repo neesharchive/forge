@@ -21,12 +21,17 @@ ok
 info hole
 ok hole vertices 50 triangles 96 solid yes volume 4.969E+02 min ... max ...
 difference cut base hole
-err boolean operations are not implemented yet        <- the project
-export base base.stl
-ok wrote 684 bytes to base.stl
+ok
+check cut
+ok cut solid yes shells 1 genus 1 euler 0 ... open-edges 0 ... volume 18802.4539466808
+export cut cut.stl
+ok wrote 20884 bytes to cut.stl
 save bracket.forge
-ok saved 4 commands to bracket.forge
+ok saved 5 commands to bracket.forge
 ```
+
+`genus 1` is the topology saying what the eye sees: one hole, all the
+way through.
 
 That transcript is the whole architecture:
 
@@ -47,7 +52,9 @@ That transcript is the whole architecture:
 "Proven geometry" in year one means proven **topology**: a solid is a
 closed, consistently oriented triangle mesh, `Is_Solid` says so, and
 every kernel operation promises solid in, solid out. Coordinates are
-`Long_Float`; proving floating-point booleans is not a capstone.
+fixed point on a 2**-32 mm grid, and the booleans decide which side of
+a plane a point is on with exact integer arithmetic (`Forge.Exact`):
+the geometry is not proven yet, but it is now the kind that can be.
 
 ## What is in the seed
 
@@ -56,30 +63,35 @@ src/forge.ads             Scalar, Vec3, Axis, Name                          Pure
 src/forge-mesh.ads        Tri_Mesh, Well_Formed, Is_Watertight, Volume      SPARK, proof target
 src/forge-primitives.ads  Box, Cylinder (solid, centred)                    done
 src/forge-transform.ads   Translate, Rotate, Scale                          done
-src/forge-csg.ads         Union, Difference, Intersection                   PLACEHOLDER: the project
+src/forge-exact.ads       exact integer plane tests on the fixed-point grid  done
+src/forge-validity.ads    fast solid check: shells, genus, open edges, ...  done (M1)
+src/forge-csg.ads         Union, Difference, Intersection + result repair   done (M2, BSP)
 src/forge-stl.ads         binary STL writer                                 done
 src/forge-commands.ads    the grammar: Parse <-> Image, round-trips         done
 src/forge-session.ads     named solids, history, undo, save/load, Execute   done
 cli/                      REPL, file runner, -c one-liners; exit = failures  done
 ui/README.md              the contract for the GUI (adi2 + OpenGLAda)        contract only
-examples/bracket.forge    an L bracket with a hole waiting for difference
-tests/                    56 checks: topology, primitives, STL, grammar round trip, session
+examples/bracket.forge    an L bracket: wall fused on, hole drilled through
+tests/                    131 checks: topology, fixed point, exact tests, validity, CSG, session
 ```
 
-Everything runs. The hole in the middle is exactly the size of the
-capstone: `Forge.CSG.Apply`.
+Everything runs, booleans included. What is left of the capstone is
+making them robust (milestone 4) and everything above them.
 
 Read `ARCHITECTURE.md` before touching anything.
 
 ## Milestones
 
-1. **Faster `Is_Watertight`.** It is O(NT^2) in the seed. Sort the
-   directed edges, or hash them; keep the spec. Then prove it (M2).
-2. **BSP-tree CSG.** The classic algorithm (csg.js): build a BSP from
-   each mesh, clip each against the other, invert for difference,
-   concatenate. Robust enough for primitives, produces slivers. When
-   `difference cut base hole` returns `ok` and `info cut` says
-   `solid yes`, the bracket in `examples/` is a real part.
+1. **Faster `Is_Watertight`.** Done as `Forge.Validity.Inspect`:
+   directed edges sorted, O(NT log NT), and it also catches the
+   "bowtie" vertex the edge test cannot see. `Is_Watertight` stays as
+   the O(NT^2) reference; the tests check the two agree. Proving the
+   fast one equal to the reference is still open.
+2. **BSP-tree CSG.** Done: csg.js, plus a repair pass (weld, T-joints,
+   spike removal, fan) so the output is an indexed solid. The bracket
+   in `examples/` is a real part. Where two solids only touch along a
+   line or at a point, the honest answer is not a solid, and the
+   kernel says so instead of returning one.
 3. **Extrude.** A 2D polygon along Z. Second primitive, first one
    with user-supplied topology, so the "solid out" promise has to be
    checked, not assumed.

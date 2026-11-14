@@ -8,20 +8,39 @@ with Forge.Transform;
 
 package body Forge.Session is
 
+   use type CSG.Outcome;
+
    procedure Free is new Ada.Unchecked_Deallocation (Tri_Mesh, Mesh_Access);
    pragma Unreferenced (Free);
    --  Meshes are allocated once per slot and reused; nothing frees them
    --  before the program ends. Kept for a future Session finalizer.
 
+   type Work_Access is access CSG.Workspace;
+   procedure Release_Work is new Ada.Unchecked_Deallocation (CSG.Workspace, Work_Access);
+   --  A boolean's workspace lives only for that boolean, sized to it.
+
    procedure Set (R : out Response; Ok : Boolean; Msg : String) renames Responses.Set;
    procedure Append (R : in out Response; Msg : String) renames Responses.Append;
+
+   --  'Image gives a negative number no leading space; add one.
+   function Field (Img : String) return String is
+     (if Img'Length > 0 and then Img (Img'First) = '-' then ' ' & Img else Img);
+
    function Find (S : Session; N : Name) return Natural;
    function Slot_For (S : in out Session; N : Name) return Natural;
    procedure Release (S : in out Session; I : Positive);
    procedure Clear_Solids (S : in out Session);
+   procedure Run_Boolean
+     (S      : in out Session;
+      Op     : CSG.Operation;
+      IA, IB : Positive;
+      Status : out CSG.Outcome;
+      Reason : out CSG.Reason_String;
+      Last   : out Natural);
    procedure Apply (S : in out Session; C : Command; R : out Response);
    procedure Replay (S : in out Session);
    procedure Do_Info (S : Session; N : Name; R : out Response);
+   procedure Do_Check (S : Session; N : Name; R : out Response);
    procedure Do_List (S : Session; R : out Response);
    procedure Do_Export (S : Session; N : Name; Path : String; R : out Response);
    procedure Do_Save (S : Session; Path : String; R : out Response);
@@ -83,6 +102,53 @@ package body Forge.Session is
    end Clear_Solids;
 
    ---------------------------------------------------------------------
+   --  Booleans
+   ---------------------------------------------------------------------
+
+   --  A op B into S.Scratch. A full workspace is grown fourfold, twice.
+   procedure Run_Boolean
+     (S      : in out Session;
+      Op     : CSG.Operation;
+      IA, IB : Positive;
+      Status : out CSG.Outcome;
+      Reason : out CSG.Reason_String;
+      Last   : out Natural)
+   is
+      A     : Tri_Mesh renames S.Solids (IA).M.all;
+      B     : Tri_Mesh renames S.Solids (IB).M.all;
+      Total : constant Triangle_Index :=
+        Triangle_Index (Natural'Min (Natural (A.NT) + Natural (B.NT),
+                                     Natural (Triangle_Index'Last)));
+      Polygons, Points, Nodes : CSG.Count;
+      Work   : Work_Access;
+      Factor : Positive := 1;
+   begin
+      if S.Scratch = null then
+         S.Scratch := new Tri_Mesh (Default_Cap_V, Default_Cap_T);
+      end if;
+      for Attempt in 1 .. 3 loop
+         CSG.Size_For (Total, Factor, Polygons, Points, Nodes);
+         Work := new CSG.Workspace (Polygons, Points, Nodes);
+         CSG.Apply (Op, A, B, S.Scratch.all, Work.all, S.Checker.all, Status, Reason, Last);
+         Release_Work (Work);
+         exit when Status /= CSG.Workspace_Full or else Attempt = 3;
+         Factor := Factor * 4;
+      end loop;
+   exception
+      when Storage_Error =>
+         Release_Work (Work);
+         Clear (S.Scratch.all);
+         Status := CSG.Workspace_Full;
+         declare
+            Msg : constant String := "not enough memory for this boolean";
+         begin
+            Reason := [others => ' '];
+            Reason (1 .. Msg'Length) := Msg;
+            Last := Msg'Length;
+         end;
+   end Run_Boolean;
+
+   ---------------------------------------------------------------------
    --  Apply one modeling command to the solids. No history here.
    ---------------------------------------------------------------------
 
@@ -101,11 +167,15 @@ package body Forge.Session is
          return I;
       end Need;
 
+      --  The kernel's promise, checked at the boundary.
       procedure Ensure_Solid (I : Positive) is
+         Rep : Validity.Report;
       begin
-         if not Is_Solid (S.Solids (I).M.all) then
+         Validity.Inspect (S.Solids (I).M.all, S.Checker.all, Rep);
+         if not Rep.Solid then
             Release (S, I);
-            Set (R, False, "err kernel produced a non-solid mesh; discarded");
+            Set (R, False, "err kernel produced a non-solid mesh ("
+                 & Validity.Problem (Rep) & "); discarded");
          end if;
       end Ensure_Solid;
 
@@ -173,9 +243,10 @@ package body Forge.Session is
 
          when Union | Difference | Intersect =>
             declare
-               IA : constant Natural := Need (C.A);
-               IB : Natural := 0;
-               IR : Natural := 0;
+               IA     : constant Natural := Need (C.A);
+               IB     : Natural := 0;
+               IR     : Natural := 0;
+               Status : CSG.Outcome;
                Reason : CSG.Reason_String;
                Last   : Natural;
                Op : constant CSG.Operation :=
@@ -189,20 +260,19 @@ package body Forge.Session is
                if IB = 0 then
                   return;
                end if;
-               if C.Result = C.A or else C.Result = C.B then
-                  Set (R, False, "err result must be a new name (in-place csg is a milestone)");
+               --  Via scratch, so the result may reuse the name of A or B.
+               Run_Boolean (S, Op, IA, IB, Status, Reason, Last);
+               if Status /= CSG.Success then
+                  Set (R, False, "err " & Reason (1 .. Last));
                   return;
                end if;
                IR := Slot_For (S, C.Result);
                if IR = 0 then
                   Set (R, False, "err solid table full"); return;
                end if;
-               CSG.Apply (Op, S.Solids (IA).M.all, S.Solids (IB).M.all,
-                          S.Solids (IR).M.all, Ok, Reason, Last);
+               Mesh.Copy (S.Scratch.all, S.Solids (IR).M.all, Ok);
                if not Ok then
-                  Release (S, IR);
-                  Set (R, False, "err " & Reason (1 .. Last));
-                  return;
+                  Release (S, IR); Set (R, False, "err mesh capacity"); return;
                end if;
                Ensure_Solid (IR);
             end;
@@ -269,18 +339,47 @@ package body Forge.Session is
          return;
       end if;
       declare
-         M : Tri_Mesh renames S.Solids (I).M.all;
-         Lo, Hi : Vec3;
+         M   : Tri_Mesh renames S.Solids (I).M.all;
+         Lo  : Vec3;
+         Hi  : Vec3;
+         Rep : Validity.Report;
       begin
          Bounds (M, Lo, Hi);
+         Validity.Inspect (M, S.Checker.all, Rep);
          Set (R, True, "ok " & Image (N));
          Append (R, " vertices" & M.NV'Image & " triangles" & M.NT'Image);
-         Append (R, " solid " & (if Is_Solid (M) then "yes" else "NO"));
-         Append (R, " volume" & Volume (M)'Image);
-         Append (R, " min" & Lo.X'Image & Lo.Y'Image & Lo.Z'Image);
-         Append (R, " max" & Hi.X'Image & Hi.Y'Image & Hi.Z'Image);
+         Append (R, " solid " & (if Rep.Solid then "yes" else "NO"));
+         Append (R, " volume" & Field (Rep.Volume'Image));
+         Append (R, " min" & Field (Lo.X'Image) & Field (Lo.Y'Image) & Field (Lo.Z'Image));
+         Append (R, " max" & Field (Hi.X'Image) & Field (Hi.Y'Image) & Field (Hi.Z'Image));
       end;
    end Do_Info;
+
+   --  The full validity report, as "key value" pairs.
+   procedure Do_Check (S : Session; N : Name; R : out Response) is
+      I   : constant Natural := Find (S, N);
+      Rep : Validity.Report;
+   begin
+      if I = 0 then
+         Set (R, False, "err no solid named " & Image (N));
+         return;
+      end if;
+      Validity.Inspect (S.Solids (I).M.all, S.Checker.all, Rep);
+      Set (R, True, "ok " & Image (N) & " solid " & (if Rep.Solid then "yes" else "NO"));
+      if not Rep.Solid then
+         Append (R, " (" & Validity.Problem (Rep) & ")");
+      end if;
+      Append (R, " shells" & Rep.Shells'Image
+              & " genus" & (if Rep.Manifold then Field (Rep.Genus'Image) else " -")
+              & " euler" & Field (Rep.Euler'Image));
+      Append (R, " vertices" & Rep.Vertices'Image & " edges" & Rep.Edges'Image
+              & " triangles" & Rep.Triangles'Image);
+      Append (R, " open-edges" & Rep.Open_Edges'Image
+              & " repeated-edges" & Rep.Repeated_Edges'Image
+              & " nonmanifold-vertices" & Rep.Nonmanifold_Vertices'Image);
+      Append (R, " slivers" & Rep.Slivers'Image & " degenerate" & Rep.Degenerate'Image);
+      Append (R, " area" & Rep.Area'Image & " volume" & Field (Rep.Volume'Image));
+   end Do_Check;
 
    procedure Do_List (S : Session; R : out Response) is
    begin
@@ -374,6 +473,9 @@ package body Forge.Session is
       Ok  : Boolean;
       Err : Path_String;
    begin
+      if S.Checker = null then
+         S.Checker := new Validity.Workspace (Default_Cap_V, Validity.Edges_For (Default_Cap_T));
+      end if;
       if Line'Length > Max_Line then
          Set (R, False, "err line too long");
          return;
@@ -405,6 +507,7 @@ package body Forge.Session is
             end if;
          when List    => Do_List (S, R);
          when Info    => Do_Info (S, C.Target, R);
+         when Check   => Do_Check (S, C.Target, R);
          when Export  => Do_Export (S, C.Ex_Name, Image (C.Ex_Path), R);
          when Save    => Do_Save (S, Image (C.File), R);
          when Load    => Do_Load (S, Image (C.File), R);

@@ -22,6 +22,7 @@
 
 with Forge.Commands; use Forge.Commands;
 with Forge.Mesh;     use Forge.Mesh;
+with Forge.Validity;
 
 with Bedrock.Responses;
 
@@ -85,10 +86,14 @@ private
 
    type History_Array is array (1 .. Max_History) of Command;
 
+   type Check_Access is access Validity.Workspace;
+
    type Session is limited record
       Solids  : Solid_Table;
       History : History_Array;
-      Count   : Natural := 0;   --  history length
+      Count   : Natural := 0;          --  history length
+      Scratch : Mesh_Access := null;   --  a boolean's result, before it is stored
+      Checker : Check_Access := null;  --  validity workspace, room for any one solid
    end record;
 
 end Forge.Session;

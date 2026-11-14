@@ -228,6 +228,11 @@ package body Forge.Commands with SPARK_Mode => Off is
             if G then
                C := (K => Info, Target => Names (1));
             end if;
+         elsif Verb = "check" then
+            Need (2); Get_Name (2, 1);
+            if G then
+               C := (K => Check, Target => Names (1));
+            end if;
          elsif Verb = "list" then
             Need (1);
             C := (K => List);
@@ -317,6 +322,8 @@ package body Forge.Commands with SPARK_Mode => Off is
             return "delete " & Image (C.Target);
          when Info =>
             return "info " & Image (C.Target);
+         when Check =>
+            return "check " & Image (C.Target);
          when List =>
             return "list";
          when Undo =>

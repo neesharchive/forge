@@ -1,0 +1,58 @@
+# A pipe flange: a bolted disk with a hub, six ribs, a keyed bore,
+# six bolt holes and a cross-drilled pin hole.
+# Cylinders stand on the Z axis, centred on the origin; rotate turns
+# about the origin, so "rotate x z 60" walks a part around the axis.
+# Repeated features (ribs, bolts) are gathered into one solid first and
+# applied with a single boolean, the way a CAD user would pattern them.
+
+# The disk and the hub (disk: z -5..5, hub: z -5..35)
+cylinder flange 40 10 64
+cylinder hub 22 40 64
+translate hub 0 0 15
+union part flange hub
+
+# The bore, right through, and a keyway cut into its side
+cylinder bore 14 80 64
+difference part part bore
+box key 6 6 80
+translate key 14 0 15
+difference part part key
+
+# Six ribs between the hub and the rim, at 30, 90, 150, ... degrees
+box rib 20 4 20
+translate rib 28 0 14
+rotate rib z 30
+copy ribs rib
+rotate rib z 60
+union ribs ribs rib
+rotate rib z 60
+union ribs ribs rib
+rotate rib z 60
+union ribs ribs rib
+rotate rib z 60
+union ribs ribs rib
+rotate rib z 60
+union ribs ribs rib
+union part part ribs
+
+# Six bolt holes on a 30 mm circle, between the ribs
+cylinder bolt 4 20 24
+translate bolt 30 0 0
+copy bolts bolt
+rotate bolt z 60
+union bolts bolts bolt
+rotate bolt z 60
+union bolts bolts bolt
+rotate bolt z 60
+union bolts bolts bolt
+rotate bolt z 60
+union bolts bolts bolt
+rotate bolt z 60
+union bolts bolts bolt
+difference part part bolts
+
+# A pin hole drilled across the hub, through the bore and the keyway
+cylinder pin 5 60 32
+rotate pin y 90
+translate pin 0 0 25
+difference part part pin

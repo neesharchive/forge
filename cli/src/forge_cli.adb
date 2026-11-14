@@ -15,6 +15,8 @@
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Forge.Session;    use Forge.Session;
+with Forge;
+with Forge.Mesh;       use Forge.Mesh;
 
 procedure Forge_CLI is
    S        : Session;
@@ -22,9 +24,59 @@ procedure Forge_CLI is
    Failures : Natural := 0;
    I        : Positive := 1;
 
+   procedure Show_Summary;
+   procedure Show_Summary is
+   begin
+      Put_Line ("---  Forge Session ---");
+      Put_Line ("Solids:" & Natural'Image (Solid_Count (S)));
+
+      for J in 1 .. Solid_Count (S) loop
+         declare
+            N : constant Forge.Name := Solid_Name (S, J);
+            M : constant Mesh_View := Mesh_Of (S, N);
+            Lo, Hi : Forge.Vec3;
+         begin
+            Bounds (M.all, Lo, Hi);
+
+            Put_Line (" " & Forge.Image (N));
+            Put_Line ("   Vertices: " & Vertex_Index'Image (M.NV));
+            Put_Line ("   Triangles: " & Triangle_Index'Image (M.NT));
+            Put_Line ("   Volume: " & Forge.Scalar'Image (Volume (M.all)));
+            Put_Line
+               ("   Valid Solid: " &
+                (if Is_Solid (M.all) then "Yes" else "No"));
+
+            Put_Line
+               ("  Min: (" &
+                Forge.Scalar'Image (Lo.X) & ", " &
+                Forge.Scalar'Image (Lo.Y) & ", " &
+                Forge.Scalar'Image (Lo.Z) & ")");
+
+            Put_Line
+               ("  Max: (" &
+                Forge.Scalar'Image (Hi.X) & ", " &
+                Forge.Scalar'Image (Hi.Y) & ", " &
+                Forge.Scalar'Image (Hi.Z) & ")");
+         end;
+      end loop;
+
+      Put_Line ("History:" & Natural'Image (History_Length (S)));
+
+      for J in 1 .. History_Length (S) loop
+         Put_Line (" " & History_Line (S, J));
+      end loop;
+
+      Put_Line ("----------------------");
+   end Show_Summary;
+
    procedure Run (Line : String);
    procedure Run (Line : String) is
    begin
+      if Line = "summary" then
+         Show_Summary;
+         return;
+      end if;
+
       Execute (S, Line, R);
       Put_Line (Image (R));
       if not R.Ok then

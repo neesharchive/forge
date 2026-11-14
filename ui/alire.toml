@@ -1,0 +1,14 @@
+name = "forge_gui"
+description = "Example graphical interface for the Forge geometry library"
+version = "0.1.0-dev"
+authors = ["Forge Team 29"]
+licenses = "Apache-2.0"
+project-files = ["forge_ui.gpr"]
+
+[[depends-on]]
+forge = "*"
+adi2 = "*"
+
+[[pins]]
+forge = { path = ".." }
+adi2 = { url = "https://github.com/ovenpasta/adi2.git", commit = "71f4635a3fcab9d5293df8e0cd9b4d53df44c602" }

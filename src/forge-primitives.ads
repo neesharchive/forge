@@ -20,4 +20,9 @@ package Forge.Primitives with SPARK_Mode is
    --  Axis along Z. Two fans of Segments triangles for the caps, 2 per
    --  segment for the wall: NV = 2 * Segments + 2, NT = 4 * Segments.
 
+   procedure Sphere (M : in out Tri_Mesh; R : Scalar; Ok : out Boolean)
+     with Pre => R > 0.0, Post => Well_Formed (M);
+   --  Origin-centred sphere with 16 longitudes and 8 latitude intervals.
+   --  NV = 114, NT = 224; outward triangles and shared pole vertices.
+
 end Forge.Primitives;

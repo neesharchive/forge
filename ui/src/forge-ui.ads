@@ -11,4 +11,7 @@ package Forge.UI is
 
    function History_Line (Index : Positive) return String;
 
+   function Tree_Text return String;
+   --  Current document hierarchy, with siblings in operand order.
+
 end Forge.UI;

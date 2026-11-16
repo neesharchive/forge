@@ -98,21 +98,27 @@ in CSG a reason. No exceptions cross a kernel boundary.
 
 ## Session
 
-`Solids`: a fixed table of 64 named `Mesh_Access`, allocated once per
-slot at first use and reused. `History`: 4096 modeling commands.
-`Execute` parses, dispatches, and for modeling commands appends to the
-history only on success, so the history is always replayable.
+`Tree`: 64 named nodes (`Forge.Solid_Trees`), each with a mesh
+allocated once per slot and reused. Primitives are leaves; a boolean is
+a node whose children are its operands, in order, and whose mesh is
+their result: `difference part disk bore key` is disk - bore - key, one
+boolean at a time. Operands stay alive under it (they count against the
+64), so moving, replacing or deleting one recomputes every boolean
+above it. A result name is always new, and an operand belongs to one
+boolean; `copy` makes another. `History`: 4096 modeling commands, with
+redo. `Execute` appends to the history only on success, so the history
+is always replayable.
 
-`Ensure_Solid` after every primitive and CSG result: if the kernel hands
-back something that fails the solid check (`Forge.Validity`), the
-session discards it and reports why. The kernel's promise is checked at
-the boundary, which is what lets `ui/` trust `Mesh_Of` blindly.
+Every primitive and boolean result passes the solid check
+(`Forge.Validity`) or the command fails. The kernel's promise is checked
+at the boundary, which is what lets `ui/` trust `Mesh_Of` blindly.
 
 The session also owns the kernel's scratch memory: one validity
-workspace, allocated on first use, and one workspace per boolean, sized
-to its inputs and grown fourfold (twice at most) if the kernel reports
-it full. A boolean is computed into a scratch mesh and then copied into
-place, so `difference base base hole` cuts `base` in place.
+workspace, two scratch meshes, and one workspace per boolean, sized to
+its inputs and grown fourfold (twice at most) if the kernel reports it
+full. A new boolean is computed in scratch before the model is touched,
+so a refused one changes nothing. A command that fails after touching
+the model is undone by replaying the history.
 
 ## Commands
 

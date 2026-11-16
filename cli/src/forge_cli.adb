@@ -16,6 +16,7 @@ with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Forge.Session;    use Forge.Session;
 with Forge;
+with Forge.Solid_Trees; use Forge.Solid_Trees;
 with Forge.Mesh;       use Forge.Mesh;
 
 procedure Forge_CLI is
@@ -26,9 +27,17 @@ procedure Forge_CLI is
 
    procedure Show_Summary;
    procedure Show_Summary is
+      Nodes : constant Node_Array := View_Tree (S);
+      Mesh_Count : Natural := 0;
    begin
+      for N of Nodes loop
+         if N.Kind in Box_Node .. Sphere_Node then
+            Mesh_Count := Mesh_Count + 1;
+         end if;
+      end loop;
       Put_Line ("---  Forge Session ---");
-      Put_Line ("Solids:" & Natural'Image (Solid_Count (S)));
+      Put_Line ("Objects:" & Natural'Image (Solid_Count (S)));
+      Put_Line ("Solids:" & Natural'Image (Mesh_Count));
 
       for J in 1 .. Solid_Count (S) loop
          declare
@@ -36,27 +45,36 @@ procedure Forge_CLI is
             M : constant Mesh_View := Mesh_Of (S, N);
             Lo, Hi : Forge.Vec3;
          begin
-            Bounds (M.all, Lo, Hi);
+            if M = null then
+               for Item of Nodes loop
+                  if Forge."=" (Item.N, N) then
+                     Put_Line (" " & Forge.Image (N) & " " & Item.Kind'Image &
+                               " geometry pending");
+                  end if;
+               end loop;
+            else
+               Bounds (M.all, Lo, Hi);
 
-            Put_Line (" " & Forge.Image (N));
-            Put_Line ("   Vertices: " & Vertex_Index'Image (M.NV));
-            Put_Line ("   Triangles: " & Triangle_Index'Image (M.NT));
-            Put_Line ("   Volume: " & Forge.Scalar'Image (Volume (M.all)));
-            Put_Line
-               ("   Valid Solid: " &
-                (if Is_Solid (M.all) then "Yes" else "No"));
+               Put_Line (" " & Forge.Image (N));
+               Put_Line ("   Vertices: " & Vertex_Index'Image (M.NV));
+               Put_Line ("   Triangles: " & Triangle_Index'Image (M.NT));
+               Put_Line ("   Volume: " & Forge.Scalar'Image (Volume (M.all)));
+               Put_Line
+                  ("   Valid Solid: " &
+                   (if Is_Solid (M.all) then "Yes" else "No"));
 
-            Put_Line
-               ("  Min: (" &
-                Forge.Scalar'Image (Lo.X) & ", " &
-                Forge.Scalar'Image (Lo.Y) & ", " &
-                Forge.Scalar'Image (Lo.Z) & ")");
+               Put_Line
+                  ("  Min: (" &
+                   Forge.Scalar'Image (Lo.X) & ", " &
+                   Forge.Scalar'Image (Lo.Y) & ", " &
+                   Forge.Scalar'Image (Lo.Z) & ")");
 
-            Put_Line
-               ("  Max: (" &
-                Forge.Scalar'Image (Hi.X) & ", " &
-                Forge.Scalar'Image (Hi.Y) & ", " &
-                Forge.Scalar'Image (Hi.Z) & ")");
+               Put_Line
+                  ("  Max: (" &
+                   Forge.Scalar'Image (Hi.X) & ", " &
+                   Forge.Scalar'Image (Hi.Y) & ", " &
+                   Forge.Scalar'Image (Hi.Z) & ")");
+            end if;
          end;
       end loop;
 

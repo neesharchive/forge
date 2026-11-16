@@ -72,7 +72,7 @@ src/forge-session.ads     named solids, history, undo, save/load, Execute   done
 cli/                      REPL, file runner, -c one-liners; exit = failures  done
 ui/README.md              the contract for the GUI (adi2 + OpenGLAda)        contract only
 examples/bracket.forge    an L bracket: wall fused on, hole drilled through
-tests/                    131 checks: topology, fixed point, exact tests, validity, CSG, session
+tests/                    193 checks: topology, fixed point, exact tests, validity, CSG, session, tree
 ```
 
 Everything runs, booleans included. What is left of the capstone is

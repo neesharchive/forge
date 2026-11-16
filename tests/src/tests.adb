@@ -2,8 +2,10 @@ pragma Warnings (Off, "static fixed-point value is not a multiple of Small");
 --  Unit tests. Plain Ada, no framework, non-zero exit on failure.
 
 with Ada.Command_Line;
+with Ada.Directories;
 with Ada.Numerics;
 with Ada.Numerics.Generic_Elementary_Functions;
+with GNAT.OS_Lib;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Forge;            use Forge;
 with Forge.Commands;   use Forge.Commands;
@@ -12,6 +14,7 @@ with Forge.Exact;
 with Forge.Mesh;       use Forge.Mesh;
 with Forge.Primitives;
 with Forge.Session;    use Forge.Session;
+with Forge.Solid_Trees; use Forge.Solid_Trees;
 with Forge.STL;
 with Forge.Transform;
 with Forge.Validity;
@@ -36,6 +39,7 @@ procedure Tests is
    procedure Test_CSG_Kernel;
    procedure Test_Exact;
    procedure Test_CSG;
+   procedure Test_Tree;
 
    procedure Check (Name : String; Cond : Boolean) is
    begin
@@ -255,6 +259,12 @@ procedure Tests is
       Check ("rotate keeps solid", Is_Solid (M));
       Transform.Scale (M, 2.0);
       Check ("scale x2 gives x8 volume", Near (Volume (M), 8.0 * 6.2832, 2.0e-3));
+      Primitives.Sphere (M, 1.0, Ok);
+      Check ("sphere counts and topology", Ok and then M.NV = 114
+             and then M.NT = 224 and then Is_Solid (M));
+      Check ("sphere outward volume", Volume (M) > 3.8 and Volume (M) < 4.2);
+      Primitives.Sphere (M, Scalar'Small, Ok);
+      Check ("collapsed sphere rejected", not Ok and M.NT = 0);
    end Test_Primitives;
 
    procedure Test_STL is
@@ -295,6 +305,16 @@ procedure Tests is
       Round_Trip ("check a");
       Round_Trip ("copy k a");
       Round_Trip ("delete k");
+      Round_Trip ("cube c 2 1.5 2 3 0.125");
+      Round_Trip ("sphere s 0.125");
+      Round_Trip ("move c 1 2 3");
+      Round_Trip ("resize c 0.1");
+      Round_Trip ("intersect g a b c d");
+      Round_Trip ("difference g a b c");
+      Round_Trip ("tree");
+      Round_Trip ("history");
+      Round_Trip ("redo");
+      Round_Trip ("export workspace.stl");
 
       Parse ("box a 1 2", C, Ok, Err);
       Check ("too few args rejected", not Ok);
@@ -330,7 +350,6 @@ procedure Tests is
       Execute (S, "undo", R);
       Check ("undo removes union", R.Ok and Solid_Count (S) = 2 and History_Length (S) = 3);
       Execute (S, "undo", R);
-      Check ("undo removes copy", R.Ok and Solid_Count (S) = 1 and History_Length (S) = 2);
       Execute (S, "undo", R);
       Execute (S, "undo", R);
       Check ("undo to empty", Solid_Count (S) = 0 and History_Length (S) = 0);
@@ -350,10 +369,10 @@ procedure Tests is
       Execute (S, "box p 6 4 2", R);
       Execute (S, "cylinder h 0.5 4 16", R);
       Execute (S, "translate h -1.5 0 0", R);
-      Execute (S, "difference p p h", R);
-      Execute (S, "translate h 3 0 0", R);
-      Execute (S, "difference p p h", R);
-      Execute (S, "check p", R);
+      Execute (S, "copy h2 h", R);
+      Execute (S, "translate h2 3 0 0", R);
+      Execute (S, "difference p2 p h h2", R);
+      Execute (S, "check p2", R);
       declare
          Want : constant String := " genus 2 euler -2 ";
       begin
@@ -445,6 +464,8 @@ procedure Tests is
         new Validity.Workspace (Cap_V => 65_536, Cap_E => Validity.Edges_For (131_072));
 
       procedure Run (Line : String);
+      procedure Pair (Verb, Result, A, B : String);
+      procedure Clear_All;
       function Vol (N : String) return Scalar;
       function Rep (N : String) return Validity.Report;
       function Says (Part : String) return Boolean;
@@ -457,6 +478,26 @@ procedure Tests is
             Put_Line ("      unexpected: " & Line & " -> " & Image (R));
          end if;
       end Run;
+
+      --  A shape is the operand of one Boolean only, so each Boolean here
+      --  takes copies (Result_1, Result_2) and A and B stay at the top.
+      procedure Pair (Verb, Result, A, B : String) is
+      begin
+         Run ("copy " & Result & "_1 " & A);
+         Run ("copy " & Result & "_2 " & B);
+         Execute (S, Verb & " " & Result & " " & Result & "_1 " & Result & "_2", R);
+      end Pair;
+
+      --  Delete everything at the top level, operands with it, to free
+      --  the 64 slots.
+      procedure Clear_All is
+      begin
+         for N of View_Tree (S) loop
+            if N.Kind /= World_Node and then N.Parent = World then
+               Run ("delete " & Image (N.N));
+            end if;
+         end loop;
+      end Clear_All;
 
       function Vol (N : String) return Scalar is
         (if Has_Solid (S, To_Name (N)) then Rep (N).Volume else -1.0);
@@ -484,9 +525,9 @@ procedure Tests is
       Run ("box a 2 2 2");
       Run ("box b 2 2 2");
       Run ("translate b 1 1 1");
-      Run ("union u a b");
-      Run ("intersect i a b");
-      Run ("difference d a b");
+      Pair ("union", "u", "a", "b");
+      Pair ("intersect", "i", "a", "b");
+      Pair ("difference", "d", "a", "b");
       Check ("csg: union of offset cubes = 8 + 8 - 1", Near (Vol ("u"), 15.0));
       Check ("csg: intersection = 1", Near (Vol ("i"), 1.0));
       Check ("csg: difference = 8 - 1", Near (Vol ("d"), 7.0));
@@ -497,35 +538,36 @@ procedure Tests is
       --  Faces that coincide exactly: the classic failure of booleans.
       Run ("box c 2 2 2");
       Run ("translate c 2 0 0");
-      Run ("union ac a c");
+      Pair ("union", "ac", "a", "c");
       Check ("csg: cubes sharing a face fuse: one shell, volume 16, area 40",
              Rep ("ac").Shells = 1 and Near (Vol ("ac"), 16.0) and Near (Rep ("ac").Area, 40.0));
       Run ("box e 2 2 2");
       Run ("translate e 1 0 0");
-      Run ("union ae a e");
+      Pair ("union", "ae", "a", "e");
       Check ("csg: four shared face planes give a clean 3 x 2 x 2 block",
              Near (Vol ("ae"), 12.0) and Near (Rep ("ae").Area, 32.0));
 
       --  Apart, inside, identical.
       Run ("box f 1 1 1");
       Run ("translate f 10 0 0");
-      Run ("union af a f");
+      Pair ("union", "af", "a", "f");
       Check ("csg: disjoint union keeps two shells",
              Rep ("af").Shells = 2 and Near (Vol ("af"), 9.0));
       declare
-         H : constant Natural := History_Length (S);
+         H : constant Natural := History_Length (S) + 2;
       begin
-         Execute (S, "intersect none a f", R);
+         Pair ("intersect", "none", "a", "f");
          Check ("csg: disjoint intersection is an error and is not recorded",
                 not R.Ok and History_Length (S) = H and Says ("empty"));
       end;
       Run ("box g 1 1 1");
-      Run ("difference void a g");
+      Pair ("difference", "void", "a", "g");
       Check ("csg: a cube with a cube-shaped void inside: 2 shells, volume 7",
              Rep ("void").Solid and Rep ("void").Shells = 2 and Near (Vol ("void"), 7.0));
-      Run ("union same a a");
-      Check ("csg: A union A is A, triangle for triangle",
+      Pair ("union", "same", "a", "a");
+      Check ("csg: A union a copy of A is A, triangle for triangle",
              Near (Vol ("same"), 8.0) and Mesh_Of (S, To_Name ("same")).NT = 12);
+      Clear_All;
 
       --  A hole through a plate: genus 1, and the volume of the 32-gon.
       Run ("box plate 4 4 2");
@@ -539,13 +581,14 @@ procedure Tests is
              Near (Vol ("pin"), 4.0 * Gon (32, 1.0), 1.0e-8));
 
       --  Oblique: nothing lines up, every cut is a rounded crossing.
+      Run ("box a 2 2 2");
       Run ("box o 2 2 2");
       Run ("rotate o z 30");
       Run ("rotate o x 20");
       Run ("translate o 0.3 0.2 0.1");
-      Run ("union ao a o");
-      Run ("intersect io a o");
-      Run ("difference do a o");
+      Pair ("union", "ao", "a", "o");
+      Pair ("intersect", "io", "a", "o");
+      Pair ("difference", "do", "a", "o");
       Check ("csg: oblique cubes, union + intersection = a + o",
              Near (Vol ("ao") + Vol ("io"), Vol ("a") + Vol ("o")));
       Check ("csg: oblique difference = a - intersection",
@@ -557,9 +600,9 @@ procedure Tests is
       Run ("cylinder p 1 4 24");
       Run ("cylinder q 0.5 4 24");
       Run ("rotate q x 90");
-      Run ("union pq p q");
-      Run ("intersect ipq p q");
-      Run ("difference dpq p q");
+      Pair ("union", "pq", "p", "q");
+      Pair ("intersect", "ipq", "p", "q");
+      Pair ("difference", "dpq", "p", "q");
       Check ("csg: crossed pipes, union + intersection = both prisms",
              Near (Vol ("pq") + Vol ("ipq"), Vol ("p") + Vol ("q")));
       Check ("csg: pipe drilled across by a thinner pipe has genus 1",
@@ -569,28 +612,39 @@ procedure Tests is
       Run ("cylinder p2 1 4 24");
       Run ("rotate p2 x 90");
       declare
-         H : constant Natural := History_Length (S);
+         H : constant Natural := History_Length (S) + 2;
       begin
-         Execute (S, "difference pinched p p2", R);
+         Pair ("difference", "pinched", "p", "p2");
          Check ("csg: equal pipes crossing touch at two points: refused",
                 not R.Ok and Says ("pinches") and History_Length (S) = H);
          Run ("box k 2 2 2");
          Run ("translate k 2 2 2");
-         Execute (S, "union bow a k", R);
+         Pair ("union", "bow", "a", "k");
          Check ("csg: cubes touching at a corner: refused as a nonmanifold vertex",
                 not R.Ok and Says ("nonmanifold vertex"));
       end;
 
-      --  In place, then undo, which replays every boolean from the text.
+      --  An operand stays live under its Boolean: move it or delete it and
+      --  the Boolean is recomputed. Then undo, which replays every boolean
+      --  from the text.
+      Run ("copy v_1 a");
+      Run ("box v_2 1 1 1");
+      Run ("difference v v_1 v_2");
+      Check ("csg: a cube with a void", Near (Vol ("v"), 7.0) and Rep ("v").Shells = 2);
+      Run ("translate v_2 0 0 0.5");
+      Check ("csg: moving the operand up to the top face recomputes v: the void becomes a pocket",
+             Rep ("v").Solid and Rep ("v").Shells = 1 and Near (Vol ("v"), 7.0));
       declare
          Before : constant Scalar := Vol ("ao");
       begin
-         Run ("difference a a g");
-         Check ("csg: in place, a := a - g", Near (Vol ("a"), 7.0) and Rep ("a").Shells = 2);
+         Run ("delete v_2");
+         Check ("csg: deleting the operand recomputes v from what is left",
+                Near (Vol ("v"), 8.0) and Mesh_Of (S, To_Name ("v")).NT = 12);
          Run ("undo");
-         Check ("csg: undo restores a", Near (Vol ("a"), 8.0));
+         Check ("csg: undo restores the pocket", Near (Vol ("v"), 7.0) and Rep ("v").Shells = 1);
          Check ("csg: replay is exact, bit for bit", Vol ("ao") = Before);
       end;
+      Clear_All;
 
       --  The bracket from examples/: wall fused on, hole drilled through.
       Run ("box base 60 8 40");
@@ -606,48 +660,160 @@ procedure Tests is
       Check ("csg: bracket volume = both boxes - the 8 mm of the hole inside the base",
              Near (Vol ("bracket"), 60.0 * 8.0 * 40.0 + 8.0 * 50.0 * 40.0 - Vol ("hole") * 8 / 10));
 
-      --  A chain of booleans: six ribs one at a time, then a bore through
-      --  the needles they left at their seams (guards Face_Planes).
+      --  A chain of booleans: one union of the disk, the hub and six ribs
+      --  is eight booleans on one part, then a bore through the needles
+      --  they left at their seams (guards Face_Planes).
       Run ("cylinder flange 40 10 64");
       Run ("cylinder hub 22 40 64");
       Run ("translate hub 0 0 15");
-      Run ("union part flange hub");
-      Run ("box rib 20 4 20");
-      Run ("translate rib 28 0 14");
-      Run ("rotate rib z 30");
-      Run ("union part part rib");
+      Run ("box rib1 20 4 20");
+      Run ("translate rib1 28 0 14");
+      Run ("rotate rib1 z 30");
       for I in 2 .. 6 loop
-         Run ("rotate rib z 60");
-         Run ("union part part rib");
+         Run ("copy rib" & Character'Val (48 + I) & " rib" & Character'Val (47 + I));
+         Run ("rotate rib" & Character'Val (48 + I) & " z 60");
       end loop;
-      declare
-         Ribbed : constant Scalar := Vol ("part");
-      begin
-         Run ("cylinder bore 14 80 64");
-         Execute (S, "difference part part bore", R);
-         Check ("csg: six ribs one at a time, then a bore, is a solid with one through-hole",
-                R.Ok and then Rep ("part").Solid and then Rep ("part").Genus = 1);
-         Check ("csg: the bore removes exactly its 64-gon over the 40 mm of hub",
-                Near (Vol ("part"), Ribbed - Gon (64, 14.0) * 40));
-      end;
+      Run ("union ribbed flange hub rib1 rib2 rib3 rib4 rib5 rib6");
+      Run ("cylinder bore 14 80 64");
+      Execute (S, "difference bored ribbed bore", R);
+      Check ("csg: six ribs one at a time, then a bore, is a solid with one through-hole",
+             R.Ok and then Rep ("bored").Solid and then Rep ("bored").Genus = 1);
+      Check ("csg: the bore removes exactly its 64-gon over the 40 mm of hub",
+             Near (Vol ("bored"), Vol ("ribbed") - Gon (64, 14.0) * 40));
 
       --  Then a keyway and bolt holes one at a time (guards the figure-8
       --  split in Fan).
       Run ("box key 6 6 80");
       Run ("translate key 14 0 15");
-      Run ("difference part part key");
-      Run ("cylinder bolt 4 20 24");
-      Run ("translate bolt 30 0 0");
-      Run ("difference part part bolt");
-      for I in 2 .. 3 loop
-         Run ("rotate bolt z 60");
-         Execute (S, "difference part part bolt", R);
-      end loop;
+      Run ("cylinder bolt1 4 20 24");
+      Run ("translate bolt1 30 0 0");
+      Run ("copy bolt2 bolt1");
+      Run ("rotate bolt2 z 60");
+      Run ("copy bolt3 bolt2");
+      Run ("rotate bolt3 z 60");
+      Execute (S, "difference part bored key bolt1 bolt2 bolt3", R);
       Check ("csg: keyway and three bolt holes cut one at a time: a solid of genus 4",
              R.Ok and then Rep ("part").Solid and then Rep ("part").Genus = 4);
    end Test_CSG;
 
+   procedure Test_Tree is
+      use type Ada.Directories.File_Size;
+      S, Loaded : Forge.Session.Session;
+      R : Response;
+      PID : constant String :=
+        GNAT.OS_Lib.Pid_To_Integer (GNAT.OS_Lib.Current_Process_Id)'Image;
+      Path : constant String := "forge-tree-" & PID (2 .. PID'Last);
+      procedure Edit (Line : String);
+      procedure Edit (Line : String) is
+      begin
+         Execute (S, Line, R);
+         Check (Line, R.Ok);
+      end Edit;
+   begin
+      Edit ("cube a 2");
+      Edit ("cube b 2");
+      Edit ("union g a b");
+      Edit ("move g 9000 0 0");
+      Edit ("move a -9000 0 0");
+      Edit ("resize g 0.5");
+      declare
+         Lo, Hi : Vec3;
+      begin
+         Bounds (Mesh_Of (S, To_Name ("a")).all, Lo, Hi);
+         Check ("pivot resize accepts valid final coordinates", Lo.X = -0.5 and Hi.X = 0.5);
+         Bounds (Mesh_Of (S, To_Name ("b")).all, Lo, Hi);
+         Check ("pivot resize keeps other child near pivot", Lo.X = 8999.5 and Hi.X = 9000.5);
+      end;
+      Edit ("move a 1 0 0");
+      Edit ("undo");
+      declare
+         Tree : constant Node_Array := View_Tree (S);
+         History : constant Command_Array := View_History (S, True);
+         Before : constant Vec3 := Mesh_Of (S, To_Name ("a")).V (1);
+      begin
+         Execute (S, "move g 10000 0 0", R);
+         Check ("failed group transform restores earlier child", not R.Ok
+                and then Mesh_Of (S, To_Name ("a")).V (1) = Before);
+         Check ("failed edit preserves tree and redo", View_Tree (S) = Tree
+                and View_History (S, True) = History and History_Length (S) = 6);
+         Execute (S, "resize g 0.00000000023283064365386962890625", R);
+         Check ("collapsed resize restores state", not R.Ok and then View_Tree (S) = Tree);
+      end;
+      Edit ("redo");
+      Edit ("undo");
+      Edit ("sphere s 1");
+      Execute (S, "redo", R);
+      Check ("successful edit discards redo", not R.Ok);
+      Edit ("difference nested g s");
+      --  a sits inside the sphere and is cut away; b, 9 m off, is all that is left.
+      Check ("nested Boolean holds its result",
+             Is_Solid (Mesh_Of (S, To_Name ("nested")).all)
+             and then Near (Volume (Mesh_Of (S, To_Name ("nested")).all), 1.0));
+      Execute (S, "union invalid a s", R);
+      Check ("non-sibling operands rejected", not R.Ok);
+      Execute (S, "union invalid a a", R);
+      Check ("duplicate operands rejected", not R.Ok);
+      Edit ("save " & Path & ".forge");
+      Execute (Loaded, "load " & Path & ".forge", R);
+      Check ("saved nested tree replays exactly", R.Ok and then View_Tree (Loaded) = View_Tree (S)
+             and then View_History (Loaded) = View_History (S));
+      Execute (S, "export " & Path & ".stl", R);
+      Check ("workspace export writes the evaluated group", R.Ok
+             and then Ada.Directories.Exists (Path & ".stl"));
+      Edit ("delete nested");
+      Check ("delete removes complete subtree", Solid_Count (S) = 0);
+      Edit ("undo");
+      Check ("undo restores subtree", View_Tree (S) = View_Tree (Loaded));
+      Edit ("redo");
+      Check ("redo deletes subtree", Solid_Count (S) = 0);
+
+      declare
+         N : constant Forge.Name := Make_Cube (S, 1000.0, Scale => 0.00001);
+         Before : constant Vec3 := Mesh_Of (S, N).V (1);
+         Sphere_Name : Forge.Name;
+      begin
+         Scale_Shape (S, N, 0.00001);
+         Check ("small absolute scale is idempotent", Mesh_Of (S, N).V (1) = Before);
+         Move_Shape (S, N, 5.0, 0.0, 0.0);
+         Sphere_Name := Make_Sphere (S, 1.0, X => -5.0);
+         Check ("typed sphere builds a solid", Is_Solid (Mesh_Of (S, Sphere_Name).all));
+         Forge.Session.Undo (S);
+         Execute (S, "save " & Path & "-active.forge", R);
+         Check ("save while undone succeeds", R.Ok);
+         Execute (Loaded, "load " & Path & "-active.forge", R);
+         Check ("save keeps only active prefix", R.Ok and then View_Tree (Loaded) = View_Tree (S)
+                and then View_History (Loaded, True)'Length = History_Length (S));
+         Forge.Session.Export (S, Path & ".stl");
+         Check ("typed export writes STL", Ada.Directories.Size (Path & ".stl") = 684);
+         Forge.Session.Redo (S);
+         Check ("export preserves redo", Has_Solid (S, Sphere_Name));
+         declare
+            Group : constant Forge.Name := Subtraction (S, Name_Array'[Sphere_Name, N]);
+         begin
+            Check ("typed group preserves operand order",
+                   (for some Item of View_Tree (S) => Item.N = Sphere_Name
+                    and then Item.Parent = Group and then Item.Order = 1));
+            Forge.Session.Undo (S);
+         end;
+         Delete_Shape (S, N);
+         Delete_Shape (S, Sphere_Name);
+         begin
+            Forge.Session.Export (S, Path & ".stl");
+            Check ("typed empty export raises", False);
+         exception
+            when Invalid_Command =>
+               Check ("typed empty export preserves destination",
+                      Ada.Directories.Size (Path & ".stl") = 684);
+         end;
+      end;
+
+      Ada.Directories.Delete_File (Path & ".stl");
+      Ada.Directories.Delete_File (Path & ".forge");
+      Ada.Directories.Delete_File (Path & "-active.forge");
+   end Test_Tree;
+
 begin
+   Test_Tree;
    Test_Fixed;
    Test_Mesh;
    Test_Validity;

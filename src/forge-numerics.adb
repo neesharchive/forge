@@ -1,4 +1,11 @@
 package body Forge.Numerics is
+   function Rescale (Value, Numerator, Denominator : Scalar) return Scalar is
+      type Product is delta 2.0 ** (-64) range -(2.0 ** 63) .. 2.0 ** 63 - 2.0 ** (-64)
+        with Small => 2.0 ** (-64), Size => 128;
+   begin
+      return Product (Value * Numerator) / Denominator;
+   end Rescale;
+
    function Sin (Angle : Scalar) return Scalar is
       Turns : constant Long_Long_Integer := Long_Long_Integer (Angle / (2 * Pi));
       A : Scalar := Angle - Scalar (Turns) * (2 * Pi);

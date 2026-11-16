@@ -48,8 +48,9 @@ package Forge.Session is
    function Union (S : in out Session; Shapes : Name_Array) return Name;
    function Subtraction (S : in out Session; Shapes : Name_Array) return Name;
    function Intersection (S : in out Session; Shapes : Name_Array) return Name;
-   --  Group distinct siblings in supplied order; subtract later operands
-   --  from the first. The result is computed one operand at a time.
+   --  Combine distinct top-level shapes in supplied order; subtract later
+   --  operands from the first. The result is computed one operand at a
+   --  time. A shape already inside a Boolean must be copied first.
    procedure Undo (S : in out Session);
    procedure Redo (S : in out Session);
    --  Typed conveniences raise Invalid_Command when Execute reports failure.

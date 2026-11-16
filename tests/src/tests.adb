@@ -631,6 +631,9 @@ procedure Tests is
       Run ("box v_2 1 1 1");
       Run ("difference v v_1 v_2");
       Check ("csg: a cube with a void", Near (Vol ("v"), 7.0) and Rep ("v").Shells = 2);
+      Execute (S, "union w v_1 v_2", R);
+      Check ("csg: operands of v cannot be regrouped, which would turn v into a union",
+             not R.Ok and Says ("already an operand of v") and Near (Vol ("v"), 7.0));
       Run ("translate v_2 0 0 0.5");
       Check ("csg: moving the operand up to the top face recomputes v: the void becomes a pocket",
              Rep ("v").Solid and Rep ("v").Shells = 1 and Near (Vol ("v"), 7.0));

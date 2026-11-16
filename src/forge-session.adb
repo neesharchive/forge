@@ -387,8 +387,11 @@ package body Forge.Session is
             begin
                for J in Shapes'Range loop
                   Index := Need (Shapes (J));
-                  if S.Tree (Index).Parent /= First.Parent then
-                     raise Invalid_Command with "Boolean operands must be siblings";
+                  --  Regrouping operands of an existing Boolean would change
+                  --  what that Boolean computes, without a word.
+                  if S.Tree (Index).Parent /= World then
+                     raise Invalid_Command with Image (Shapes (J)) & " is already an operand of "
+                       & Image (S.Tree (Index).Parent) & "; copy it first";
                   end if;
                   for K in Shapes'First .. J - 1 loop
                      if Shapes (J) = Shapes (K) then

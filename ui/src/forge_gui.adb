@@ -41,6 +41,7 @@ procedure Forge_GUI is
    Solids_Label : Adi.Widget.Label.Label_Handle;
    Status_Label : Adi.Widget.Label.Label_Handle;
    History_Label : Adi.Widget.Label.Label_Handle;
+   CSG_Label : Adi.Widget.Label.Label_Handle;
 
    --  Input field and label used for exporting a solid to STL.
    Export_Input : Adi.Widget.Text_Input.Text_Input_Handle;
@@ -204,11 +205,12 @@ procedure Forge_GUI is
 
       begin
          Adi.Widget.Label.Set_Text (Result_Label, Result);
+         Adi.Widget.Label.Set_Text (CSG_Label, Forge.UI.Tree_Text);
 
          declare
             Count : constant Natural := Forge.UI.Solid_Count;
             Names : Ada.Strings.Unbounded.Unbounded_String :=
-              Ada.Strings.Unbounded.To_Unbounded_String ("Solids:");
+              Ada.Strings.Unbounded.To_Unbounded_String ("Objects:");
          begin
             if Count = 0 then
                Ada.Strings.Unbounded.Append (Names, " (none)");
@@ -230,7 +232,7 @@ procedure Forge_GUI is
               (Status_Label,
                "Geometry Status" &
                Ada.Characters.Latin_1.LF &
-               "Solid count:" & Natural'Image (Count));
+               "Object count:" & Natural'Image (Count));
          end;
 
          declare
@@ -420,11 +422,6 @@ begin
       Export_Panel : constant Adi.Widget.Box.Box_Handle :=
          Adi.Widget.Box.Create_Handle;
 
-      --  ** Placeholder for the CSG tree output
-      CSG_Label : constant Adi.Widget.Label.Label_Handle :=
-        Adi.Widget.Label.Create_Handle
-          ("CSG Tree - pending integration");
-
       Title : constant Adi.Widget.Label.Label_Handle :=
         Adi.Widget.Label.Create_Handle ("Forge Geometry Library");
 
@@ -439,6 +436,7 @@ begin
 
    begin
       Blink_Input := Input;
+      CSG_Label := Adi.Widget.Label.Create_Handle (Forge.UI.Tree_Text);
 
       --  Create the labels and input fields used to display
       --  model information and provide STL export controls.
@@ -446,7 +444,7 @@ begin
         Adi.Widget.Label.Create_Handle ("Enter a command to begin.");
 
       Solids_Label :=
-        Adi.Widget.Label.Create_Handle ("Solids: (none)");
+        Adi.Widget.Label.Create_Handle ("Objects: (none)");
 
       History_Label :=
         Adi.Widget.Label.Create_Handle ("Command History: (none)");
@@ -455,7 +453,7 @@ begin
         Adi.Widget.Label.Create_Handle
           ("Geometry Status" &
            Ada.Characters.Latin_1.LF &
-           "Solid count: 0");
+           "Object count: 0");
 
       Export_Label :=
         Adi.Widget.Label.Create_Handle ("Solid to export:");

@@ -15,6 +15,14 @@ package Forge.STL with SPARK_Mode is
    function Size (M : Tri_Mesh) return Positive is (84 + 50 * Positive (M.NT + 1) - 50)
      with Pre => Well_Formed (M);
 
+   procedure Write_Header (Triangle_Count : Natural; Buffer : out Byte_Array)
+     with Pre => Buffer'Length = 84;
+   --  Header for one or more meshes streamed into the same STL file.
+
+   procedure Write_Triangle (M : Tri_Mesh; I : Triangle_Index; Buffer : out Byte_Array)
+     with Pre => Well_Formed (M) and then I in 1 .. M.NT and then Buffer'Length = 50;
+   --  One complete binary STL triangle, including its attribute bytes.
+
    procedure Write (M : Tri_Mesh; Buffer : out Byte_Array; Last : out Natural)
      with Pre  => Well_Formed (M) and then Buffer'Length >= Size (M),
           Post => Last = Buffer'First + Size (M) - 1;

@@ -53,6 +53,22 @@ package body Forge.Transform with SPARK_Mode => Off is
       M.V (1 .. M.NV) := Candidate;
    end Scale;
 
+   procedure Scale_About
+     (M : in out Tri_Mesh; Pivot : Vec3; Numerator, Denominator : Scalar)
+   is
+      Candidate : Vertex_Array (1 .. M.NV);
+   begin
+      for I in 1 .. M.NV loop
+         Candidate (I) :=
+           (Pivot.X + Numerics.Rescale (M.V (I).X - Pivot.X, Numerator, Denominator),
+            Pivot.Y + Numerics.Rescale (M.V (I).Y - Pivot.Y, Numerator, Denominator),
+            Pivot.Z + Numerics.Rescale (M.V (I).Z - Pivot.Z, Numerator, Denominator));
+         Check_Point (Candidate (I));
+      end loop;
+      Check_Faces (M, Candidate);
+      M.V (1 .. M.NV) := Candidate;
+   end Scale_About;
+
    procedure Rotate (M : in out Tri_Mesh; About : Axis; Degrees : Scalar) is
       Candidate : Vertex_Array (1 .. M.NV);
       A : constant Scalar := Scalar (Degrees * Numerics.Pi) / 180;

@@ -91,3 +91,21 @@ fi
 
 rm -f "$moved_file"
 
+# Tree groups must remain safe in the summary; workspace export contains both meshes.
+output=$(printf '%s\n' 'cube a 2' 'cube b 2 5 0 0 1' \
+  "export $stl_file" 'union g a b' 'summary' | alr run)
+check "Objects: 3" "summary counts tree objects"
+check "UNION_NODE geometry pending" "summary handles a group without a mesh"
+python3 - "$stl_file" <<'PY'
+import struct
+import sys
+from pathlib import Path
+
+data = Path(sys.argv[1]).read_bytes()
+assert len(data) == 84 + 50 * 24
+assert struct.unpack_from("<I", data, 80)[0] == 24
+xs = [struct.unpack_from("<f", data, 84 + i * 50 + 12 + j * 12)[0]
+      for i in range(24) for j in range(3)]
+assert min(xs) == -1.0 and max(xs) == 6.0
+print("PASS  workspace export contains both transformed meshes")
+PY

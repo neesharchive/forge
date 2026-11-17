@@ -111,4 +111,61 @@ package body Forge.Primitives with SPARK_Mode => Off is
       end if;
    end Cylinder;
 
+   procedure Sphere (M : in out Tri_Mesh; R : Scalar; Ok : out Boolean) is
+      Segments : constant := 16;
+      Rings : constant := 7;
+      Vertices : array (1 .. Rings, 1 .. Segments) of Vertex_Index;
+      Bottom, Top : Vertex_Index;
+      procedure Tri (A, B, C : Vertex_Index);
+      procedure Tri (A, B, C : Vertex_Index) is
+      begin
+         if Ok then
+            Add_Triangle (M, A, B, C, Ok);
+         end if;
+      end Tri;
+   begin
+      Clear (M);
+      Ok := False;
+      if M.Cap_V < 114 or else M.Cap_T < 224 then
+         return;
+      end if;
+      Add_Vertex (M, (0.0, 0.0, -R), Bottom, Ok);
+      Add_Vertex (M, (0.0, 0.0, R), Top, Ok);
+      for I in 1 .. Rings loop
+         for J in 1 .. Segments loop
+            declare
+               Latitude : constant Scalar := -Numerics.Pi / 2
+                 + Numerics.Pi * I / 8;
+               Longitude : constant Scalar := Numerics.Pi * (2 * (J - 1)) / 16;
+               Radius : constant Scalar := R * Numerics.Cos (Latitude);
+            begin
+               Add_Vertex (M, (Radius * Numerics.Cos (Longitude), Radius * Numerics.Sin (Longitude),
+                               R * Numerics.Sin (Latitude)), Vertices (I, J), Ok);
+            end;
+         end loop;
+      end loop;
+      for J in 1 .. Segments loop
+         declare
+            Next : constant Positive := (if J = Segments then 1 else J + 1);
+         begin
+            Tri (Bottom, Vertices (1, Next), Vertices (1, J));
+            Tri (Top, Vertices (Rings, J), Vertices (Rings, Next));
+            for I in 1 .. Rings - 1 loop
+               Tri (Vertices (I, J), Vertices (I, Next), Vertices (I + 1, Next));
+               Tri (Vertices (I, J), Vertices (I + 1, Next), Vertices (I + 1, J));
+            end loop;
+         end;
+      end loop;
+      if Ok then
+         for I in 1 .. M.NT loop
+            if Normal (M, I) = Origin then
+               Ok := False;
+            end if;
+         end loop;
+      end if;
+      if not Ok then
+         Clear (M);
+      end if;
+   end Sphere;
+
 end Forge.Primitives;

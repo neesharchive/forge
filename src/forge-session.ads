@@ -1,38 +1,23 @@
---  The session: the single entry point for every front end.
---
---     Execute (S, "box base 40 20 10", Response)
---
---  That is the whole API. The CLI reads lines from stdin and calls it.
---  The GUI builds a line when you click and calls it. An agent calls
---  it. A .forge file is lines; Load calls it once per line. Nothing
---  above this package touches the kernel directly, so nothing above
---  this package can do what a script cannot.
---
---  State = named solids + history of modeling commands. The solids are
---  always what you get by replaying the history from empty; Undo pops
---  the history and replays. O(n) per undo, obviously correct, and it
---  keeps the invariant "the text is the model" literally true.
---
---  Memory: meshes are heap-allocated here, and only here. The kernel
---  (Forge.Mesh and below) never allocates; it computes on meshes it is
---  handed. This package is a desktop program's business.
---
---  Read-back for renderers is Mesh_Of: a constant view of a named
---  solid. A GUI draws that; it does not edit it.
+--  One document and one history for both text and typed commands.
+--  Primitive meshes use the existing kernel. Boolean commands currently
+--  group operands in the tree; Mesh_Of returns null for those placeholders.
+--  Undo replays the active history; redo retains the undone suffix.
 
 with Forge.Commands; use Forge.Commands;
 with Forge.Mesh;     use Forge.Mesh;
 
+with Forge.Solid_Trees; use Forge.Solid_Trees;
 with Bedrock.Responses;
+with Ada.Containers.Vectors;
 
 package Forge.Session is
 
-   Max_Solids  : constant := 64;
+   Max_Solids  : constant := Solid_Trees.Max_Solids;
    Max_History : constant := 4096;
 
    type Session is limited private;
 
-   Max_Response : constant := 1024;
+   Max_Response : constant := 8192;
 
    --  The GAP line protocol's reply, from bedrock: "ok", "ok <info>",
    --  or "err <reason>". Same type in framewise and yarlib's console.
@@ -41,17 +26,51 @@ package Forge.Session is
    function Image (R : Response) return String renames Responses.Image;
 
    procedure Execute (S : in out Session; Line : String; R : out Response);
-   --  Parses and runs one line. Modeling commands are appended to the
-   --  history only if they succeed. Queries do not change state.
-   --  Export writes a file; Save writes the history; Load replaces the
-   --  session with the file's history (replayed, stopping at the first
-   --  failing line, which is reported).
+   procedure Execute (S : in out Session; C : Command; R : out Response);
+   --  Text and typed commands share validation, execution and history.
+   --  Successful edits discard redo; failures restore the previous model.
+   --  Seed save/load and named mesh export remain available.
+
+   Invalid_Command : exception;
+   function Make_Cube
+     (S : in out Session; Length : Scalar;
+      X, Y, Z : Scalar := 0.0; Scale : Scalar := 1.0) return Name;
+   function Make_Sphere
+     (S : in out Session; Radius : Scalar;
+      X, Y, Z : Scalar := 0.0; Scale : Scalar := 1.0) return Name;
+   --  Create a mesh and tree leaf, returning an automatically chosen name.
+   procedure Delete_Shape (S : in out Session; Shape : Name);
+   procedure Move_Shape (S : in out Session; Shape : Name; X, Y, Z : Scalar);
+   procedure Scale_Shape (S : in out Session; Shape : Name; Scale : Scalar);
+   --  Delete a subtree, set world position, or set scale about its position.
+   --  Legacy translate/scale commands remain relative, about the world origin.
+   function Union (S : in out Session; Shapes : Name_Array) return Name;
+   function Subtraction (S : in out Session; Shapes : Name_Array) return Name;
+   function Intersection (S : in out Session; Shapes : Name_Array) return Name;
+   --  Group distinct siblings in supplied order; subtract later operands
+   --  from the first. No Boolean geometry is evaluated at this stage.
+   procedure Undo (S : in out Session);
+   procedure Redo (S : in out Session);
+   --  Typed conveniences raise Invalid_Command when Execute reports failure.
+   procedure Export (S : Session; Filepath : String);
+   --  Export top-level meshes as separate shells in one binary STL.
+   --  Empty workspaces and pending Boolean groups raise Invalid_Command.
+   --  No history or redo changes. Named export is available through Execute.
+
+   type Command_Array is array (Positive range <>) of Command;
+   function View_History
+     (S : Session; Include_Redo : Boolean := False) return Command_Array;
+   --  Detached commands, oldest first; History_Length is the active cursor.
+   function View_Tree (S : Session) return Node_Array;
+   --  Detached live nodes, World first. Join Parent to N, sort by Order.
+   --  These typed queries return full data; text responses are bounded.
 
    ---------------------------------------------------------------------
    --  Read-back, for front ends
    ---------------------------------------------------------------------
 
    function Solid_Count (S : Session) return Natural;
+   --  Number of tree objects, including Boolean groups and their operands.
    function Solid_Name (S : Session; I : Positive) return Name
      with Pre => I <= Solid_Count (S);
    function Has_Solid (S : Session; N : Name) return Boolean;
@@ -64,7 +83,7 @@ package Forge.Session is
    function History_Length (S : Session) return Natural;
    function History_Line (S : Session; I : Positive) return String
      with Pre => I <= History_Length (S);
-   --  The document, line by line. Save writes exactly these.
+   --  The active document, line by line, using Commands.Image.
 
 private
 
@@ -75,19 +94,16 @@ private
 
    type Mesh_Access is access Tri_Mesh;
 
-   type Solid is record
-      Used : Boolean := False;
-      N    : Name;
-      M    : Mesh_Access := null;
-   end record;
-
-   type Solid_Table is array (1 .. Max_Solids) of Solid;
-
-   type History_Array is array (1 .. Max_History) of Command;
+   type Mesh_Table is array (1 .. Max_Solids) of Mesh_Access;
+   package Histories is new Ada.Containers.Vectors (Positive, Command);
+   --  History grows on the heap, up to Max_History; operand lists must
+   --  not put several megabytes on the stack of every Session caller.
 
    type Session is limited record
-      Solids  : Solid_Table;
-      History : History_Array;
+      Tree    : Solid_Tree := [0 => (N => World, others => <>), others => <>];
+      Meshes  : Mesh_Table := [others => null];
+      History : Histories.Vector;
+      Serial  : Positive := 1; --  generated names; not rewound by undo
       Count   : Natural := 0;   --  history length
    end record;
 

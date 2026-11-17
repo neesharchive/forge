@@ -2,7 +2,7 @@ package body Forge.Commands with SPARK_Mode => Off is
    --  Off: text parsing and formatting are outside SPARK. The grammar is
    --  small enough that a hand-written SPARK tokenizer is a fair task.
 
-   Max_Tokens : constant := 8;
+   Max_Tokens : constant := Max_Operands + 3;
    type Token_Bounds is record
       First, Last : Natural := 0;
    end record;
@@ -64,7 +64,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       --  Argument slots, filled by the helpers below, read by the
       --  aggregates. Splitting "parse" from "build" sidesteps the
       --  arbitrary-evaluation-order rule on in-out parameters.
-      Names : array (1 .. 4) of Name;
+      Names : Name_Array (1 .. Max_Operands + 1);
       Nums  : array (1 .. 4) of Scalar := [others => 0.0];
       Ax    : Axis := Z;
       Seg   : Positive := 32;
@@ -98,7 +98,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       end Get_Num;
 
       procedure Get_Name (Tok_I, Into : Positive) is
-         S : constant String := Tok (Tok_I);
+         S : constant String := (if G then Tok (Tok_I) else "");
       begin
          if not G then
             return;
@@ -117,7 +117,7 @@ package body Forge.Commands with SPARK_Mode => Off is
       end Get_Name;
 
       procedure Get_Axis (Tok_I : Positive) is
-         S : constant String := Lower (Tok (Tok_I));
+         S : constant String := (if G then Lower (Tok (Tok_I)) else "");
       begin
          if S = "x" then
             Ax := X;
@@ -172,6 +172,18 @@ package body Forge.Commands with SPARK_Mode => Off is
             if G then
                C := (K => Box, Box_Name => Names (1), W => Nums (1), H => Nums (2), D => Nums (3));
             end if;
+         elsif Verb = "cube" or else Verb = "sphere" then
+            G := N = 3 or else N = 7;
+            Get_Name (2, 1); Get_Num (3, 1);
+            if G then
+               C := (K => Primitive_Kind'(if Verb = "cube" then Cube else Sphere),
+                     Shape_Name => Names (1), Size => Nums (1), others => <>);
+               if N = 7 then
+                  Get_Num (4, 1); Get_Num (5, 2); Get_Num (6, 3); Get_Num (7, 4);
+                  C.Position := (Nums (1), Nums (2), Nums (3));
+                  C.Initial_Scale := Nums (4);
+               end if;
+            end if;
          elsif Verb = "cylinder" then
             if N = 5 then
                Get_Segments (5);
@@ -183,35 +195,36 @@ package body Forge.Commands with SPARK_Mode => Off is
                C := (K => Cylinder, Cyl_Name => Names (1), R => Nums (1), CH => Nums (2),
                      Segments => Seg);
             end if;
-         elsif Verb = "translate" then
+         elsif Verb = "translate" or else Verb = "move" then
             Need (5); Get_Name (2, 1); Get_Num (3, 1); Get_Num (4, 2); Get_Num (5, 3);
             if G then
-               C := (K => Translate, Tr_Name => Names (1), By => (Nums (1), Nums (2), Nums (3)));
+               C := (K => Translation_Kind'(if Verb = "move" then Move else Translate),
+                     Tr_Name => Names (1), By => (Nums (1), Nums (2), Nums (3)));
             end if;
          elsif Verb = "rotate" then
             Need (4); Get_Name (2, 1); Get_Axis (3); Get_Num (4, 1);
             if G then
                C := (K => Rotate, Rot_Name => Names (1), About => Ax, Degrees => Nums (1));
             end if;
-         elsif Verb = "scale" then
+         elsif Verb = "scale" or else Verb = "resize" then
             Need (3); Get_Name (2, 1); Get_Num (3, 1);
             if G then
-               C := (K => Scale, Sc_Name => Names (1), Factor => Nums (1));
+               C := (K => Scaling_Kind'(if Verb = "resize" then Resize else Scale),
+                     Sc_Name => Names (1), Factor => Nums (1));
             end if;
-         elsif Verb = "union" then
-            Need (4); Get_Name (2, 1); Get_Name (3, 2); Get_Name (4, 3);
+         elsif Verb = "union" or else Verb = "difference" or else Verb = "intersect" then
+            G := N in 4 .. Max_Operands + 2;
             if G then
-               C := (K => Union, Result => Names (1), A => Names (2), B => Names (3));
+               for I in 2 .. N loop
+                  Get_Name (I, I - 1);
+               end loop;
             end if;
-         elsif Verb = "difference" then
-            Need (4); Get_Name (2, 1); Get_Name (3, 2); Get_Name (4, 3);
             if G then
-               C := (K => Difference, Result => Names (1), A => Names (2), B => Names (3));
-            end if;
-         elsif Verb = "intersect" then
-            Need (4); Get_Name (2, 1); Get_Name (3, 2); Get_Name (4, 3);
-            if G then
-               C := (K => Intersect, Result => Names (1), A => Names (2), B => Names (3));
+               C := (K => Boolean_Kind'(if Verb = "union" then Union
+                           elsif Verb = "difference" then Difference else Intersect),
+                     Result => Names (1), A => Names (2), B => Names (3), others => <>);
+               C.Extra_Count := N - 4;
+               C.Extra (1 .. C.Extra_Count) := Names (4 .. N - 1);
             end if;
          elsif Verb = "copy" then
             Need (3); Get_Name (2, 1); Get_Name (3, 2);
@@ -231,20 +244,34 @@ package body Forge.Commands with SPARK_Mode => Off is
          elsif Verb = "list" then
             Need (1);
             C := (K => List);
+         elsif Verb = "tree" then
+            Need (1); C := (K => Tree_View);
+         elsif Verb = "history" then
+            Need (1); C := (K => History_View);
+         elsif Verb = "redo" then
+            Need (1); C := (K => Redo);
          elsif Verb = "undo" then
             Need (1);
             C := (K => Undo);
          elsif Verb = "export" then
-            Need (3); Get_Name (2, 1);
-            if G then
-               C := (K => Export, Ex_Name => Names (1), Ex_Path => To_Path (Tok (3)));
+            if N = 2 then
+               C := (K => Export, Ex_Name => To_Name (""), Ex_Path => To_Path (Tok (2)));
+            else
+               Need (3); Get_Name (2, 1);
+               if G then
+                  C := (K => Export, Ex_Name => Names (1), Ex_Path => To_Path (Tok (3)));
+               end if;
             end if;
          elsif Verb = "save" then
             Need (2);
-            C := (K => Save, File => To_Path (Tok (2)));
+            if G then
+               C := (K => Save, File => To_Path (Tok (2)));
+            end if;
          elsif Verb = "load" then
             Need (2);
-            C := (K => Load, File => To_Path (Tok (2)));
+            if G then
+               C := (K => Load, File => To_Path (Tok (2)));
+            end if;
          else
             Fail ("unknown command: " & Tok (1));
             return;
@@ -293,24 +320,43 @@ package body Forge.Commands with SPARK_Mode => Off is
          when Box =>
             return "box " & Image (C.Box_Name) & " " & Img (C.W) & " " & Img (C.H)
               & " " & Img (C.D);
+         when Cube | Sphere =>
+            return (if C.K = Cube then "cube " else "sphere ") & Image (C.Shape_Name)
+              & " " & Img (C.Size) & " " & Img (C.Position.X) & " " & Img (C.Position.Y)
+              & " " & Img (C.Position.Z) & " " & Img (C.Initial_Scale);
          when Cylinder =>
             return "cylinder " & Image (C.Cyl_Name) & " " & Img (C.R) & " " & Img (C.CH)
               & Positive'Image (C.Segments);
-         when Translate =>
-            return "translate " & Image (C.Tr_Name) & " " & Img (C.By.X) & " " & Img (C.By.Y)
+         when Translate | Move =>
+            return (if C.K = Move then "move " else "translate ") & Image (C.Tr_Name)
+              & " " & Img (C.By.X) & " " & Img (C.By.Y)
               & " " & Img (C.By.Z);
          when Rotate =>
             return "rotate " & Image (C.Rot_Name) & " "
               & (case C.About is when X => "x", when Y => "y", when Z => "z")
               & " " & Img (C.Degrees);
-         when Scale =>
-            return "scale " & Image (C.Sc_Name) & " " & Img (C.Factor);
-         when Union =>
-            return "union " & Image (C.Result) & " " & Image (C.A) & " " & Image (C.B);
-         when Difference =>
-            return "difference " & Image (C.Result) & " " & Image (C.A) & " " & Image (C.B);
-         when Intersect =>
-            return "intersect " & Image (C.Result) & " " & Image (C.A) & " " & Image (C.B);
+         when Scale | Resize =>
+            return (if C.K = Resize then "resize " else "scale ")
+              & Image (C.Sc_Name) & " " & Img (C.Factor);
+         when Union | Difference | Intersect =>
+            declare
+               Result : String (1 .. Max_Line);
+               Last : Natural := 0;
+               procedure Add (Text : String);
+               procedure Add (Text : String) is
+               begin
+                  Result (Last + 1 .. Last + Text'Length) := Text;
+                  Last := Last + Text'Length;
+               end Add;
+            begin
+               Add ((case C.K is when Union => "union ", when Difference => "difference ",
+                                 when others => "intersect ") & Image (C.Result)
+                    & " " & Image (C.A) & " " & Image (C.B));
+               for I in 1 .. C.Extra_Count loop
+                  Add (" " & Image (C.Extra (I)));
+               end loop;
+               return Result (1 .. Last);
+            end;
          when Copy =>
             return "copy " & Image (C.Cp_Name) & " " & Image (C.From);
          when Delete =>
@@ -319,10 +365,14 @@ package body Forge.Commands with SPARK_Mode => Off is
             return "info " & Image (C.Target);
          when List =>
             return "list";
+         when Tree_View => return "tree";
+         when History_View => return "history";
+         when Redo => return "redo";
          when Undo =>
             return "undo";
          when Export =>
-            return "export " & Image (C.Ex_Name) & " " & Image (C.Ex_Path);
+            return "export " & (if C.Ex_Name.Length = 0 then "" else Image (C.Ex_Name) & " ")
+              & Image (C.Ex_Path);
          when Save =>
             return "save " & Image (C.File);
          when Load =>

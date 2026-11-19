@@ -1,10 +1,11 @@
 --  One document and one history for both text and typed commands.
---  Primitive meshes use the existing kernel. Boolean commands currently
---  group operands in the tree; Mesh_Of returns null for those placeholders.
+--  A Boolean node keeps its operands as children and holds their result,
+--  computed by Forge.CSG and recomputed when an operand below it changes.
 --  Undo replays the active history; redo retains the undone suffix.
 
 with Forge.Commands; use Forge.Commands;
 with Forge.Mesh;     use Forge.Mesh;
+with Forge.Validity;
 
 with Forge.Solid_Trees; use Forge.Solid_Trees;
 with Bedrock.Responses;
@@ -47,14 +48,15 @@ package Forge.Session is
    function Union (S : in out Session; Shapes : Name_Array) return Name;
    function Subtraction (S : in out Session; Shapes : Name_Array) return Name;
    function Intersection (S : in out Session; Shapes : Name_Array) return Name;
-   --  Group distinct siblings in supplied order; subtract later operands
-   --  from the first. No Boolean geometry is evaluated at this stage.
+   --  Combine distinct top-level shapes in supplied order; subtract later
+   --  operands from the first. The result is computed one operand at a
+   --  time. A shape already inside a Boolean must be copied first.
    procedure Undo (S : in out Session);
    procedure Redo (S : in out Session);
    --  Typed conveniences raise Invalid_Command when Execute reports failure.
    procedure Export (S : Session; Filepath : String);
    --  Export top-level meshes as separate shells in one binary STL.
-   --  Empty workspaces and pending Boolean groups raise Invalid_Command.
+   --  An empty workspace raises Invalid_Command.
    --  No history or redo changes. Named export is available through Execute.
 
    type Command_Array is array (Positive range <>) of Command;
@@ -79,6 +81,7 @@ package Forge.Session is
    function Mesh_Of (S : Session; N : Name) return Mesh_View
      with Pre => Has_Solid (S, N);
    --  Valid until the next Execute. Copy it if you need it longer.
+   --  Operands inside a Boolean have meshes too; draw the top level.
 
    function History_Length (S : Session) return Natural;
    function History_Line (S : Session; I : Positive) return String
@@ -99,12 +102,18 @@ private
    --  History grows on the heap, up to Max_History; operand lists must
    --  not put several megabytes on the stack of every Session caller.
 
+   type Check_Access is access Validity.Workspace;
+
    type Session is limited record
       Tree    : Solid_Tree := [0 => (N => World, others => <>), others => <>];
       Meshes  : Mesh_Table := [others => null];
       History : Histories.Vector;
       Serial  : Positive := 1; --  generated names; not rewound by undo
       Count   : Natural := 0;   --  history length
+      Changed : Boolean := False;          --  the command being applied touched the model
+      Scratch : Mesh_Access := null;       --  one boolean's result
+      Running : Mesh_Access := null;       --  a Boolean node's result so far
+      Checker : Check_Access := null;      --  validity workspace, room for any one solid
    end record;
 
 end Forge.Session;

@@ -3,6 +3,7 @@ with Ada.Text_IO;
 with Ada.Assertions;
 with Ada.Exceptions;
 with Ada.Unchecked_Deallocation;
+with Forge.CSG;
 with Forge.Primitives;
 with Forge.Numerics;
 with Forge.STL;
@@ -10,20 +11,47 @@ with Forge.Transform;
 
 package body Forge.Session is
 
+   use type CSG.Outcome;
+
    procedure Free is new Ada.Unchecked_Deallocation (Tri_Mesh, Mesh_Access);
    pragma Unreferenced (Free);
    --  Meshes are allocated once per slot and reused; nothing frees them
    --  before the program ends. Kept for a future Session finalizer.
 
+   type Work_Access is access CSG.Workspace;
+   procedure Release_Work is new Ada.Unchecked_Deallocation (CSG.Workspace, Work_Access);
+   --  A boolean's workspace lives only for that boolean, sized to it.
+
+   type Index_List is array (Positive range <>) of Positive;
+
    procedure Set (R : out Response; Ok : Boolean; Msg : String) renames Responses.Set;
    procedure Append (R : in out Response; Msg : String) renames Responses.Append;
+
+   --  'Image gives a negative number no leading space; add one.
+   function Field (Img : String) return String is
+     (if Img'Length > 0 and then Img (Img'First) = '-' then ' ' & Img else Img);
+
    function Find (S : Session; N : Name) return Natural;
    function Slot_For (S : in out Session; N : Name) return Natural;
    procedure Release (S : in out Session; I : Positive);
    procedure Clear_Solids (S : in out Session);
+   function Solid (S : Session; M : Tri_Mesh) return Boolean;
+   procedure Run_Boolean
+     (Op     : CSG.Operation;
+      A, B   : Tri_Mesh;
+      Result : in out Tri_Mesh;
+      Check  : in out Validity.Workspace;
+      Status : out CSG.Outcome;
+      Reason : out CSG.Reason_String;
+      Last   : out Natural);
+   procedure Fold (S : in out Session; Op : CSG.Operation; Operands : Index_List);
+   procedure Store (S : in out Session; I : Positive);
+   procedure Evaluate (S : in out Session; I : Positive);
+   procedure Refresh_Above (S : in out Session; I : Positive);
    procedure Apply (S : in out Session; C : Command; R : out Response);
    procedure Replay (S : in out Session);
    procedure Do_Info (S : Session; N : Name; R : out Response);
+   procedure Do_Check (S : Session; N : Name; R : out Response);
    procedure Do_List (S : Session; R : out Response);
    procedure Do_Export (S : Session; N : Name; Path : String; R : out Response);
    procedure Do_Save (S : Session; Path : String; R : out Response);
@@ -55,6 +83,7 @@ package body Forge.Session is
          if S.Tree (I).Kind in Union_Node .. Intersection_Node then
             raise Invalid_Command with "cannot replace a Boolean group";
          end if;
+         S.Changed := True;
          S.Tree (I) := (N => N, Parent => S.Tree (I).Parent,
                        Order => S.Tree (I).Order, others => <>);
          Clear (S.Meshes (I).all);
@@ -65,16 +94,18 @@ package body Forge.Session is
             if S.Meshes (J) = null then
                S.Meshes (J) := new Tri_Mesh (Default_Cap_V, Default_Cap_T);
             end if;
+            S.Changed := True;
             Clear (S.Meshes (J).all);
             S.Tree (J) := (N => N, Order => S.Count + 1, others => <>);
             return J;
          end if;
       end loop;
-      raise Invalid_Command with "solid tree full";
+      raise Invalid_Command with "solid tree full (operands inside a Boolean count)";
    end Slot_For;
 
    procedure Release (S : in out Session; I : Positive) is
    begin
+      S.Changed := True;
       S.Tree (I) := (others => <>);
       Clear (S.Meshes (I).all);
    end Release;
@@ -87,6 +118,132 @@ package body Forge.Session is
          end if;
       end loop;
    end Clear_Solids;
+
+   --  The kernel's promise, checked at the boundary.
+   function Solid (S : Session; M : Tri_Mesh) return Boolean is
+      Rep : Validity.Report;
+   begin
+      Validity.Inspect (M, S.Checker.all, Rep);
+      return Rep.Solid;
+   end Solid;
+
+   ---------------------------------------------------------------------
+   --  Booleans
+   ---------------------------------------------------------------------
+
+   --  A op B into Result. A full workspace is grown fourfold, twice.
+   procedure Run_Boolean
+     (Op     : CSG.Operation;
+      A, B   : Tri_Mesh;
+      Result : in out Tri_Mesh;
+      Check  : in out Validity.Workspace;
+      Status : out CSG.Outcome;
+      Reason : out CSG.Reason_String;
+      Last   : out Natural)
+   is
+      Total : constant Triangle_Index :=
+        Triangle_Index (Natural'Min (Natural (A.NT) + Natural (B.NT),
+                                     Natural (Triangle_Index'Last)));
+      Polygons, Points, Nodes : CSG.Count;
+      Work   : Work_Access;
+      Factor : Positive := 1;
+   begin
+      for Attempt in 1 .. 3 loop
+         CSG.Size_For (Total, Factor, Polygons, Points, Nodes);
+         Work := new CSG.Workspace (Polygons, Points, Nodes);
+         CSG.Apply (Op, A, B, Result, Work.all, Check, Status, Reason, Last);
+         Release_Work (Work);
+         exit when Status /= CSG.Workspace_Full or else Attempt = 3;
+         Factor := Factor * 4;
+      end loop;
+   exception
+      when Storage_Error =>
+         Release_Work (Work);
+         Clear (Result);
+         Status := CSG.Workspace_Full;
+         declare
+            Msg : constant String := "not enough memory for this boolean";
+         begin
+            Reason := [others => ' '];
+            Reason (1 .. Msg'Length) := Msg;
+            Last := Msg'Length;
+         end;
+   end Run_Boolean;
+
+   --  Operands (1) op Operands (2) op ... into S.Running, one boolean at
+   --  a time. Touches nothing in the model, so a refusal costs nothing.
+   procedure Fold (S : in out Session; Op : CSG.Operation; Operands : Index_List) is
+      Ok     : Boolean;
+      Status : CSG.Outcome;
+      Reason : CSG.Reason_String;
+      Last   : Natural;
+   begin
+      Mesh.Copy (S.Meshes (Operands (Operands'First)).all, S.Running.all, Ok);
+      if not Ok then
+         raise Invalid_Command with "mesh capacity";
+      end if;
+      for J in Operands'First + 1 .. Operands'Last loop
+         Run_Boolean (Op, S.Running.all, S.Meshes (Operands (J)).all, S.Scratch.all,
+                      S.Checker.all, Status, Reason, Last);
+         if Status /= CSG.Success then
+            raise Invalid_Command with Reason (1 .. Last);
+         end if;
+         Mesh.Copy (S.Scratch.all, S.Running.all, Ok);
+         if not Ok then
+            raise Invalid_Command with "mesh capacity";
+         end if;
+      end loop;
+   end Fold;
+
+   --  S.Running becomes the mesh of node I.
+   procedure Store (S : in out Session; I : Positive) is
+      Ok : Boolean;
+   begin
+      S.Changed := True;
+      Mesh.Copy (S.Running.all, S.Meshes (I).all, Ok);
+      if not Ok then
+         raise Invalid_Command with "mesh capacity";
+      end if;
+      if not Solid (S, S.Meshes (I).all) then
+         raise Invalid_Command with "kernel produced a non-solid mesh";
+      end if;
+   end Store;
+
+   --  Recompute Boolean node I from its children, in operand order.
+   procedure Evaluate (S : in out Session; I : Positive) is
+      Operands : Index_List (1 .. Max_Solids) := [others => 1];
+      N, K     : Natural := 0;
+   begin
+      for J in S.Meshes'Range loop
+         if S.Tree (J).N.Length /= 0 and then S.Tree (J).Parent = S.Tree (I).N then
+            N := N + 1;
+            K := N;
+            while K > 1 and then S.Tree (Operands (K - 1)).Order > S.Tree (J).Order loop
+               Operands (K) := Operands (K - 1);
+               K := K - 1;
+            end loop;
+            Operands (K) := J;
+         end if;
+      end loop;
+      Fold (S, (case S.Tree (I).Kind is
+                  when Union_Node      => CSG.Union,
+                  when Difference_Node => CSG.Difference,
+                  when others          => CSG.Intersection),
+            Operands (1 .. N));
+      Store (S, I);
+   end Evaluate;
+
+   --  Something at node I changed: recompute every Boolean above it.
+   procedure Refresh_Above (S : in out Session; I : Positive) is
+      P : Name := S.Tree (I).Parent;
+      J : Positive;
+   begin
+      while P /= World loop
+         J := Find (S, P);
+         Evaluate (S, J);
+         P := S.Tree (J).Parent;
+      end loop;
+   end Refresh_Above;
 
    ---------------------------------------------------------------------
    --  Apply one modeling command to the solids. No history here.
@@ -160,7 +317,7 @@ package body Forge.Session is
                      Primitives.Cylinder (S.Meshes (I).all, C.R, C.CH, C.Segments, Ok);
                   when others => null;
                end case;
-               if not Ok or else not Is_Solid (S.Meshes (I).all) then
+               if not Ok or else not Solid (S, S.Meshes (I).all) then
                   raise Invalid_Command with "primitive did not produce a solid mesh";
                end if;
                if C.K in Cube | Sphere then
@@ -169,6 +326,7 @@ package body Forge.Session is
                   S.Tree (I).Position := C.Position;
                   S.Tree (I).Scale := C.Initial_Scale;
                end if;
+               Refresh_Above (S, I);   --  redefined an operand
             end;
 
          when Translate | Move | Rotate | Scale | Resize =>
@@ -195,6 +353,7 @@ package body Forge.Session is
                      Pivot := S.Tree (I).Position;
                   end if;
                end if;
+               S.Changed := True;
                for J in S.Meshes'Range loop
                   if S.Tree (J).N.Length /= 0 then
                      Ancestor := J;
@@ -214,6 +373,9 @@ package body Forge.Session is
                      end if;
                   end if;
                end loop;
+               --  I and everything under it moved together; what holds I
+               --  must be recomputed.
+               Refresh_Above (S, I);
             end;
 
          when Union | Difference | Intersect =>
@@ -221,11 +383,15 @@ package body Forge.Session is
                Shapes : constant Name_Array := Name_Array'[C.A, C.B] & C.Extra (1 .. C.Extra_Count);
                First : constant Node := S.Tree (Need (C.A));
                Index : Positive;
+               Operands : Index_List (Shapes'Range);
             begin
                for J in Shapes'Range loop
                   Index := Need (Shapes (J));
-                  if S.Tree (Index).Parent /= First.Parent then
-                     raise Invalid_Command with "Boolean operands must be siblings";
+                  --  Regrouping operands of an existing Boolean would change
+                  --  what that Boolean computes, without a word.
+                  if S.Tree (Index).Parent /= World then
+                     raise Invalid_Command with Image (Shapes (J)) & " is already an operand of "
+                       & Image (S.Tree (Index).Parent) & "; copy it first";
                   end if;
                   for K in Shapes'First .. J - 1 loop
                      if Shapes (J) = Shapes (K) then
@@ -236,6 +402,12 @@ package body Forge.Session is
                if Find (S, C.Result) /= 0 then
                   raise Invalid_Command with "Boolean result must have a new name";
                end if;
+               for J in Shapes'Range loop
+                  Operands (J) := Need (Shapes (J));
+               end loop;
+               Fold (S, (case C.K is when Union => CSG.Union,
+                           when Difference => CSG.Difference, when others => CSG.Intersection),
+                     Operands);
                I := Slot_For (S, C.Result);
                S.Tree (I).Kind := (case C.K is when Union => Union_Node,
                  when Difference => Difference_Node, when others => Intersection_Node);
@@ -246,7 +418,8 @@ package body Forge.Session is
                   S.Tree (Index).Parent := C.Result;
                   S.Tree (Index).Order := J;
                end loop;
-               Set (R, True, "ok Boolean group; geometry pending");
+               Store (S, I);
+               Refresh_Above (S, I);   --  the operands were inside a group
             end;
 
          when Copy =>
@@ -272,6 +445,7 @@ package body Forge.Session is
                S.Tree (I).N := C.Cp_Name;
                S.Tree (I).Parent := Parent;
                S.Tree (I).Order := Order;
+               Refresh_Above (S, I);   --  replaced an operand
             end;
 
          when Delete =>
@@ -286,6 +460,12 @@ package body Forge.Session is
                   Parent := S.Tree (I).Parent;
                   Release (S, I);
                end loop;
+               --  The first group that still has operands lost one.
+               if Parent /= World then
+                  I := Need (Parent);
+                  Evaluate (S, I);
+                  Refresh_Above (S, I);
+               end if;
             end;
 
          when others => raise Invalid_Command with "not a modeling command";
@@ -328,23 +508,48 @@ package body Forge.Session is
          Set (R, False, "err no solid named " & Image (N));
          return;
       end if;
-      if S.Tree (I).Kind in Union_Node .. Intersection_Node then
-         Set (R, True, "ok " & Image (N) & " Boolean group; geometry pending");
-         return;
-      end if;
       declare
-         M : Tri_Mesh renames S.Meshes (I).all;
-         Lo, Hi : Vec3;
+         M   : Tri_Mesh renames S.Meshes (I).all;
+         Lo  : Vec3;
+         Hi  : Vec3;
+         Rep : Validity.Report;
       begin
          Bounds (M, Lo, Hi);
+         Validity.Inspect (M, S.Checker.all, Rep);
          Set (R, True, "ok " & Image (N));
          Append (R, " vertices" & M.NV'Image & " triangles" & M.NT'Image);
-         Append (R, " solid " & (if Is_Solid (M) then "yes" else "NO"));
-         Append (R, " volume" & Volume (M)'Image);
-         Append (R, " min" & Lo.X'Image & Lo.Y'Image & Lo.Z'Image);
-         Append (R, " max" & Hi.X'Image & Hi.Y'Image & Hi.Z'Image);
+         Append (R, " solid " & (if Rep.Solid then "yes" else "NO"));
+         Append (R, " volume" & Field (Rep.Volume'Image));
+         Append (R, " min" & Field (Lo.X'Image) & Field (Lo.Y'Image) & Field (Lo.Z'Image));
+         Append (R, " max" & Field (Hi.X'Image) & Field (Hi.Y'Image) & Field (Hi.Z'Image));
       end;
    end Do_Info;
+
+   --  The full validity report, as "key value" pairs.
+   procedure Do_Check (S : Session; N : Name; R : out Response) is
+      I   : constant Natural := Find (S, N);
+      Rep : Validity.Report;
+   begin
+      if I = 0 then
+         Set (R, False, "err no solid named " & Image (N));
+         return;
+      end if;
+      Validity.Inspect (S.Meshes (I).all, S.Checker.all, Rep);
+      Set (R, True, "ok " & Image (N) & " solid " & (if Rep.Solid then "yes" else "NO"));
+      if not Rep.Solid then
+         Append (R, " (" & Validity.Problem (Rep) & ")");
+      end if;
+      Append (R, " shells" & Rep.Shells'Image
+              & " genus" & (if Rep.Manifold then Field (Rep.Genus'Image) else " -")
+              & " euler" & Field (Rep.Euler'Image));
+      Append (R, " vertices" & Rep.Vertices'Image & " edges" & Rep.Edges'Image
+              & " triangles" & Rep.Triangles'Image);
+      Append (R, " open-edges" & Rep.Open_Edges'Image
+              & " repeated-edges" & Rep.Repeated_Edges'Image
+              & " nonmanifold-vertices" & Rep.Nonmanifold_Vertices'Image);
+      Append (R, " slivers" & Rep.Slivers'Image & " degenerate" & Rep.Degenerate'Image);
+      Append (R, " area" & Rep.Area'Image & " volume" & Field (Rep.Volume'Image));
+   end Do_Check;
 
    procedure Do_List (S : Session; R : out Response) is
    begin
@@ -387,10 +592,6 @@ package body Forge.Session is
          Selected (J) := S.Tree (J).N.Length /= 0 and then
            (if N.Length = 0 then S.Tree (J).Parent = World else J = I);
          if Selected (J) then
-            if S.Tree (J).Kind in Union_Node .. Intersection_Node then
-               Set (R, False, "err Boolean geometry pending for " & Image (S.Tree (J).N));
-               return;
-            end if;
             Triangles := Triangles + Natural (S.Meshes (J).NT);
          end if;
       end loop;
@@ -508,6 +709,12 @@ package body Forge.Session is
          Set (R, False, "err " & Image (Error));
          return;
       end if;
+      if S.Checker = null then
+         S.Checker := new Validity.Workspace (Default_Cap_V, Validity.Edges_For (Default_Cap_T));
+         S.Scratch := new Tri_Mesh (Default_Cap_V, Default_Cap_T);
+         S.Running := new Tri_Mesh (Default_Cap_V, Default_Cap_T);
+      end if;
+      S.Changed := False;
       case C.K is
          when Modeling =>
             if S.Count >= Max_History then
@@ -523,8 +730,8 @@ package body Forge.Session is
                S.Count := S.Count + 1;
                S.History.Set_Length (Ada.Containers.Count_Type (S.Count - 1));
                S.History.Append (C);
-            else
-               Replay (S); -- restore any meshes touched by a failed operation
+            elsif S.Changed then
+               Replay (S); -- restore what the failed command had touched
             end if;
          when Undo =>
             if S.Count = 0 then
@@ -541,7 +748,7 @@ package body Forge.Session is
                Apply (S, S.History (S.Count + 1), R);
                if R.Ok then
                   S.Count := S.Count + 1;
-               else
+               elsif S.Changed then
                   Replay (S);
                end if;
             end if;
@@ -559,6 +766,7 @@ package body Forge.Session is
             end loop;
          when List    => Do_List (S, R);
          when Info    => Do_Info (S, C.Target, R);
+         when Check   => Do_Check (S, C.Target, R);
          when Commands.Export =>
             Do_Export (S, C.Ex_Name, Image (C.Ex_Path), R);
          when Save    => Do_Save (S, Image (C.File), R);
@@ -599,8 +807,7 @@ package body Forge.Session is
    function Has_Solid (S : Session; N : Name) return Boolean is (Find (S, N) /= 0);
 
    function Mesh_Of (S : Session; N : Name) return Mesh_View is
-     (if S.Tree (Find (S, N)).Kind in Union_Node .. Intersection_Node then null
-      else Mesh_View (S.Meshes (Find (S, N))));
+     (Mesh_View (S.Meshes (Find (S, N))));
 
    function History_Length (S : Session) return Natural is (S.Count);
 

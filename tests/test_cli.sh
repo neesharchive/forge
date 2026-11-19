@@ -91,11 +91,11 @@ fi
 
 rm -f "$moved_file"
 
-# Tree groups must remain safe in the summary; workspace export contains both meshes.
+# A group shows its evaluated mesh; workspace export contains both meshes.
 output=$(printf '%s\n' 'cube a 2' 'cube b 2 5 0 0 1' \
   "export $stl_file" 'union g a b' 'summary' | alr run)
 check "Objects: 3" "summary counts tree objects"
-check "UNION_NODE geometry pending" "summary handles a group without a mesh"
+check "Volume:  16.0000000000" "summary shows the union's mesh"
 python3 - "$stl_file" <<'PY'
 import struct
 import sys

@@ -81,8 +81,10 @@ package Forge.Mesh with SPARK_Mode is
    --  Every directed edge (a, b) of every triangle has exactly one
    --  triangle containing the reverse edge (b, a), and no triangle
    --  contains (a, b) twice. That single condition gives closed and
-   --  consistently oriented at once. O(NT**2) in the seed; a sort or
-   --  hash on edges is milestone 1.
+   --  consistently oriented at once. O(NT**2): this is the reference
+   --  definition. Forge.Validity.Inspect computes the same answer in
+   --  O(NT log NT) (and more); the session uses that one, and the tests
+   --  check the two agree.
 
    function Is_Solid (M : Tri_Mesh) return Boolean is
      (M.NT >= 4 and then Is_Watertight (M))

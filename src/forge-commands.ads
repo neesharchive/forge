@@ -16,13 +16,14 @@
 --    translate  NAME DX DY DZ
 --    rotate     NAME x|y|z DEGREES
 --    scale      NAME FACTOR
---    union      NAME A B [MORE ...]          group operands; geometry pending
---    difference NAME A B [MORE ...]          subtract others from A
---    intersect  NAME A B [MORE ...]
+--    union      NAME A B [MORE ...]          NAME := A + B + ...; NAME is new
+--    difference NAME A B [MORE ...]          NAME := A - B - ...
+--    intersect  NAME A B [MORE ...]          the operands become NAME's children
 --    copy       NAME FROM
 --    delete     NAME
 --    list                                     query, not recorded
 --    info       NAME                          query, not recorded
+--    check      NAME                          query: is it a solid, and why not
 --    export     NAME FILE.stl                 side effect, not recorded
 --    export     FILE.stl                      all top-level meshes in one STL
 --    tree                                     query, not recorded
@@ -42,7 +43,7 @@ package Forge.Commands with SPARK_Mode is
    type Kind is
      (Box, Cube, Sphere, Cylinder, Translate, Move, Rotate, Scale, Resize,
       Union, Difference, Intersect, Copy, Delete,
-      List, Info, Tree_View, History_View, Export, Undo, Redo, Save, Load,
+      List, Info, Check, Tree_View, History_View, Export, Undo, Redo, Save, Load,
       Comment, Empty);
 
    subtype Primitive_Kind is Kind range Cube .. Sphere;
@@ -96,7 +97,7 @@ package Forge.Commands with SPARK_Mode is
          when Copy =>
             Cp_Name  : Name;
             From     : Name;
-         when Delete | Info =>
+         when Delete | Info | Check =>
             Target   : Name;
          when Export =>
             Ex_Name  : Name; -- empty selects whole-workspace export

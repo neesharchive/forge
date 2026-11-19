@@ -44,9 +44,7 @@ package body Forge.UI is
          for N of Nodes loop
             if N.Kind /= World_Node and then N.Parent = Parent then
                Append (Text, ASCII.LF & String'(1 .. 2 * Depth => ' ') & Image (N.N)
-                       & " (" & N.Kind'Image & ")"
-                       & (if N.Kind in Union_Node .. Intersection_Node
-                          then " geometry pending" else ""));
+                       & " (" & N.Kind'Image & ")");
                Children (N.N, Depth + 1);
             end if;
          end loop;
